@@ -44,6 +44,40 @@ public sealed class TriggerRssPromotionEndpoint(
 			AddError(ex.Message);
 			await Send.ErrorsAsync(cancellation: ct);
 		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Unhandled RSS promotion failure");
+
+			var now = DateTimeOffset.UtcNow;
+			var response = new TriggerRssPromotionResponse
+			{
+				RunId = "failed-" + Guid.NewGuid().ToString("N")[..8],
+				StartedAtUtc = now,
+				CompletedAtUtc = now,
+				EntriesEvaluated = 0,
+				NewPostsAttempted = 0,
+				NewPostsSucceeded = 0,
+				ReminderPostsAttempted = 0,
+				ReminderPostsSucceeded = 0,
+				EntriesSkippedAlreadyPosted = 0,
+				EntriesSkippedOutsideWindow = 0,
+				Failures =
+				[
+					new TriggerRssPromotionFailure
+					{
+						EntryIdentity = "rss-feed",
+						CanonicalUrl = string.Empty,
+						Phase = PromotionPhase.Initial.ToString(),
+						Platform = "rss-promotion",
+						ErrorCode = "UNHANDLED_EXCEPTION",
+						ErrorMessage = ex.Message
+					}
+				],
+				LastTwoBlogPosts = []
+			};
+
+			await Send.ResponseAsync(response, 502, ct);
+		}
 	}
 
 	private static TriggerRssPromotionResponse MapToResponse(PromotionRunSummary summary)
