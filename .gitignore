@@ -1,0 +1,62 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+out/
+publish/
+artifacts/
+
+# User-specific files
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Package artifacts
+*.nupkg
+*.snupkg
+packages/
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# NuGet
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+NuGetScratch/
+
+# Test & coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Logs
+*.log
+logs/
+
+# IDE/editor folders
+.vs/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Temp files
+*.tmp
+*.swp
+
+# Local secrets/config
+secrets.json
+.env
+.env.*
+
+# Aspire
+.aspire/
