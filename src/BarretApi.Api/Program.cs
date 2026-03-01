@@ -27,6 +27,11 @@ builder.Services.AddCors(options =>
 builder.Services.Configure<BlueskyOptions>(builder.Configuration.GetSection(BlueskyOptions.SectionName));
 builder.Services.Configure<MastodonOptions>(builder.Configuration.GetSection(MastodonOptions.SectionName));
 builder.Services.Configure<ApiKeyOptions>(builder.Configuration.GetSection(ApiKeyOptions.SectionName));
+builder.Services
+    .AddOptions<BlogPromotionOptions>()
+    .Bind(builder.Configuration.GetSection(BlogPromotionOptions.SectionName))
+    .Validate(options => string.IsNullOrWhiteSpace(options.Validate()), "Invalid blog promotion options")
+    .ValidateOnStart();
 
 builder.Services
     .AddAuthentication(ApiKeyAuthHandler.SchemeName)
@@ -56,6 +61,7 @@ builder.Services.AddHttpClient<MastodonClient>((sp, client) =>
 });
 
 builder.Services.AddHttpClient<ImageDownloadService>();
+builder.Services.AddHttpClient<IBlogFeedReader, RssBlogFeedReader>();
 
 builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
     sp.GetRequiredService<BlueskyClient>());
@@ -65,6 +71,8 @@ builder.Services.AddSingleton<ITextShorteningService, TextShorteningService>();
 builder.Services.AddSingleton<IHashtagService, HashtagService>();
 builder.Services.AddSingleton<IImageDownloadService>(sp =>
     sp.GetRequiredService<ImageDownloadService>());
+builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPromotionRepository>();
+builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
 builder.Services.AddSingleton<SocialPostService>();
 
 var app = builder.Build();
