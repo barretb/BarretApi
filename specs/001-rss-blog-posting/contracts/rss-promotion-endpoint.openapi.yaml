@@ -1,0 +1,127 @@
+openapi: 3.0.3
+info:
+  title: BarretApi RSS Promotion Endpoint
+  version: 1.0.0
+  description: Trigger blog RSS promotion workflow (new posts first, reminders second).
+paths:
+  /api/social-posts/rss-promotion:
+    post:
+      summary: Trigger RSS promotion run
+      description: |
+        Executes one promotion run by evaluating the configured RSS feed.
+        The run always processes new eligible blog posts first and reminder posts second.
+      operationId: triggerRssPromotion
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Run completed (with zero or more per-entry failures captured in summary)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromotionRunSummaryResponse'
+              examples:
+                successWithMixedResults:
+                  value:
+                    runId: "20260301-7f0f8455"
+                    startedAtUtc: "2026-03-01T18:00:00Z"
+                    completedAtUtc: "2026-03-01T18:00:04Z"
+                    entriesEvaluated: 8
+                    newPostsAttempted: 2
+                    newPostsSucceeded: 2
+                    reminderPostsAttempted: 3
+                    reminderPostsSucceeded: 2
+                    entriesSkippedAlreadyPosted: 2
+                    entriesSkippedOutsideWindow: 1
+                    failures:
+                      - entryIdentity: "https://blog.example.com/posts/my-post"
+                        canonicalUrl: "https://blog.example.com/posts/my-post"
+                        phase: "Reminder"
+                        platform: "mastodon"
+                        errorCode: "PLATFORM_ERROR"
+                        errorMessage: "Timeout"
+        '400':
+          description: Invalid configuration or request preconditions failed
+        '401':
+          description: Missing or invalid X-Api-Key
+        '502':
+          description: Feed read failed or no platform operations could be completed successfully
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+  schemas:
+    PromotionRunSummaryResponse:
+      type: object
+      required:
+        - runId
+        - startedAtUtc
+        - completedAtUtc
+        - entriesEvaluated
+        - newPostsAttempted
+        - newPostsSucceeded
+        - reminderPostsAttempted
+        - reminderPostsSucceeded
+        - entriesSkippedAlreadyPosted
+        - entriesSkippedOutsideWindow
+        - failures
+      properties:
+        runId:
+          type: string
+        startedAtUtc:
+          type: string
+          format: date-time
+        completedAtUtc:
+          type: string
+          format: date-time
+        entriesEvaluated:
+          type: integer
+          minimum: 0
+        newPostsAttempted:
+          type: integer
+          minimum: 0
+        newPostsSucceeded:
+          type: integer
+          minimum: 0
+        reminderPostsAttempted:
+          type: integer
+          minimum: 0
+        reminderPostsSucceeded:
+          type: integer
+          minimum: 0
+        entriesSkippedAlreadyPosted:
+          type: integer
+          minimum: 0
+        entriesSkippedOutsideWindow:
+          type: integer
+          minimum: 0
+        failures:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromotionEntryFailure'
+    PromotionEntryFailure:
+      type: object
+      required:
+        - entryIdentity
+        - canonicalUrl
+        - phase
+        - platform
+        - errorCode
+        - errorMessage
+      properties:
+        entryIdentity:
+          type: string
+        canonicalUrl:
+          type: string
+          format: uri
+        phase:
+          type: string
+          enum: [Initial, Reminder]
+        platform:
+          type: string
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
