@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup>  <UserSecretsId>5ab39f59-57be-4eca-9b1d-13db522d5d6a</UserSecretsId>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="FastEndpoints" />
+		<PackageReference Include="FastEndpoints.Swagger" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\BarretApi.Core\BarretApi.Core.csproj" />
+		<ProjectReference Include="..\BarretApi.Infrastructure\BarretApi.Infrastructure.csproj" />
+		<ProjectReference Include="..\BarretApi.ServiceDefaults\BarretApi.ServiceDefaults.csproj" />
+	</ItemGroup>
+
+</Project>

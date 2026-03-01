@@ -1,0 +1,12 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<UserSecretsId>1579239f-b26f-45d0-9d3a-56ee4cbabf02</UserSecretsId>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\BarretApi.Api\BarretApi.Api.csproj" />
+	</ItemGroup>
+
+</Project>
