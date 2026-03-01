@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BarretApi.AppHost/BarretApi.AppHost.csproj" />
+    <Project Path="src/BarretApi.ServiceDefaults/BarretApi.ServiceDefaults.csproj" />
+    <Project Path="src/BarretApi.Api/BarretApi.Api.csproj" />
+    <Project Path="src/BarretApi.Core/BarretApi.Core.csproj" />
+    <Project Path="src/BarretApi.Infrastructure/BarretApi.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BarretApi.Core.UnitTests/BarretApi.Core.UnitTests.csproj" />
+    <Project Path="tests/BarretApi.Api.UnitTests/BarretApi.Api.UnitTests.csproj" />
+    <Project Path="tests/BarretApi.Integration.Tests/BarretApi.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

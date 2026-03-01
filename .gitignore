@@ -1,0 +1,63 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstats
+packages/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+publish/
+
+# IDE
+.vs/
+.idea/
+*.sln.iml
+
+# User secrets
+secrets.json
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+NuGetScratch/
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+ehthumbs.db
+Desktop.ini
+
+# Aspire
+.aspire/

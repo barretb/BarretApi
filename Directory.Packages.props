@@ -1,0 +1,31 @@
+<Project>
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+	</PropertyGroup>
+	<ItemGroup>
+		<!-- FastEndpoints -->
+		<PackageVersion Include="FastEndpoints" Version="8.0.0" />
+		<PackageVersion Include="FastEndpoints.Swagger" Version="8.0.0" />
+
+		<!-- Core abstractions -->
+		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
+		<PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.5" />
+
+		<!-- ServiceDefaults (Aspire template packages) -->
+		<PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
+		<PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.1.0" />
+		<PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.14.0" />
+		<PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.14.0" />
+		<PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.14.0" />
+		<PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.14.0" />
+		<PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.14.0" />
+
+		<!-- Testing -->
+		<PackageVersion Include="coverlet.collector" Version="6.0.4" />
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+		<PackageVersion Include="xunit" Version="2.9.3" />
+		<PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+		<PackageVersion Include="NSubstitute" Version="5.3.0" />
+		<PackageVersion Include="Shouldly" Version="4.3.0" />
+	</ItemGroup>
+</Project>
