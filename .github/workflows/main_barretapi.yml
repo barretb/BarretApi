@@ -3,6 +3,10 @@
 
 name: Build and deploy ASP.Net Core app to Azure Web App - barretapi
 
+env:
+  API_PROJECT_PATH: src/BarretApi.Api/BarretApi.Api.csproj
+  PUBLISH_PATH: ${{ github.workspace }}/publish
+
 on:
   push:
     branches:
@@ -23,17 +27,20 @@ jobs:
         with:
           dotnet-version: '10.x'
 
-      - name: Build with dotnet
-        run: dotnet build --configuration Release
+      - name: Restore API project
+        run: dotnet restore ${{ env.API_PROJECT_PATH }}
 
-      - name: dotnet publish
-        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+      - name: Build API project
+        run: dotnet build ${{ env.API_PROJECT_PATH }} --configuration Release --no-restore
+
+      - name: Publish API project
+        run: dotnet publish ${{ env.API_PROJECT_PATH }} --configuration Release --no-build --output ${{ env.PUBLISH_PATH }}
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
+          path: ${{ env.PUBLISH_PATH }}
 
   deploy:
     runs-on: ubuntu-latest
