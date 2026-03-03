@@ -1,0 +1,174 @@
+openapi: 3.0.3
+info:
+  title: BarretApi Social Post Endpoint (LinkedIn Extension)
+  version: 1.0.0
+  description: Add LinkedIn as a supported target platform in the existing social post endpoint.
+paths:
+  /api/social-posts:
+    post:
+      summary: Create a social post across selected platforms
+      description: |
+        Publishes one post payload to one or more target platforms.
+        This contract extends allowed platform values to include `linkedin`.
+      operationId: createSocialPost
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSocialPostRequest'
+            examples:
+              linkedinOnly:
+                value:
+                  text: "Launching our latest update"
+                  hashtags: ["dotnet", "aspnet"]
+                  platforms: ["linkedin"]
+              mixedPlatforms:
+                value:
+                  text: "New article is live"
+                  hashtags: ["azure", "csharp"]
+                  platforms: ["linkedin", "bluesky", "mastodon"]
+                  images:
+                    - url: "https://example.com/image.png"
+                      altText: "Feature announcement graphic"
+      responses:
+        '200':
+          description: All targeted platforms succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSocialPostResponse'
+              examples:
+                allSuccess:
+                  value:
+                    postedAt: "2026-03-01T12:00:00Z"
+                    results:
+                      - platform: linkedin
+                        success: true
+                        postId: "urn:li:share:123456789"
+                        postUrl: "https://www.linkedin.com/feed/update/urn%3Ali%3Ashare%3A123456789"
+                        shortenedText: "Launching our latest update #dotnet #aspnet"
+                      - platform: bluesky
+                        success: true
+                        postId: "at://did:plc:abc123/app.bsky.feed.post/xyz789"
+                        postUrl: "https://bsky.app/profile/example/post/xyz789"
+                        shortenedText: "Launching our latest update #dotnet #aspnet"
+        '207':
+          description: Partial success (at least one success and one failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSocialPostResponse'
+              examples:
+                partialSuccess:
+                  value:
+                    postedAt: "2026-03-01T12:00:00Z"
+                    results:
+                      - platform: linkedin
+                        success: false
+                        error: "LinkedIn API rejected the content"
+                        errorCode: "VALIDATION_FAILED"
+                      - platform: mastodon
+                        success: true
+                        postId: "109876543210"
+                        postUrl: "https://mastodon.social/@you/109876543210"
+                        shortenedText: "New article is live #azure #csharp"
+        '400':
+          description: Request validation failed
+        '401':
+          description: Missing or invalid X-Api-Key
+        '502':
+          description: All targeted platforms failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSocialPostResponse'
+              examples:
+                allFailed:
+                  value:
+                    postedAt: "2026-03-01T12:00:00Z"
+                    results:
+                      - platform: linkedin
+                        success: false
+                        error: "Authentication failed"
+                        errorCode: "AUTH_FAILED"
+                      - platform: bluesky
+                        success: false
+                        error: "Rate limit exceeded"
+                        errorCode: "RATE_LIMITED"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+  schemas:
+    CreateSocialPostRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          maxLength: 10000
+        hashtags:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+        platforms:
+          type: array
+          items:
+            type: string
+            enum: [bluesky, mastodon, linkedin]
+        images:
+          type: array
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/ImageAttachmentRequest'
+    ImageAttachmentRequest:
+      type: object
+      required: [url, altText]
+      properties:
+        url:
+          type: string
+          format: uri
+        altText:
+          type: string
+          maxLength: 1500
+    CreateSocialPostResponse:
+      type: object
+      required: [results, postedAt]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformResult'
+        postedAt:
+          type: string
+          format: date-time
+    PlatformResult:
+      type: object
+      required: [platform, success]
+      properties:
+        platform:
+          type: string
+          enum: [bluesky, mastodon, linkedin]
+        success:
+          type: boolean
+        postId:
+          type: string
+          nullable: true
+        postUrl:
+          type: string
+          format: uri
+          nullable: true
+        shortenedText:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        errorCode:
+          type: string
+          nullable: true

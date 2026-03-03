@@ -1,13 +1,16 @@
 using BarretApi.Api.Auth;
+using BarretApi.Api.Validation;
 using BarretApi.Core.Configuration;
 using BarretApi.Core.Interfaces;
 using BarretApi.Core.Services;
 using BarretApi.Infrastructure.Bluesky;
+using BarretApi.Infrastructure.LinkedIn;
 using BarretApi.Infrastructure.Mastodon;
 using BarretApi.Infrastructure.Services;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,10 +31,17 @@ builder.Services.Configure<BlueskyOptions>(builder.Configuration.GetSection(Blue
 builder.Services.Configure<MastodonOptions>(builder.Configuration.GetSection(MastodonOptions.SectionName));
 builder.Services.Configure<ApiKeyOptions>(builder.Configuration.GetSection(ApiKeyOptions.SectionName));
 builder.Services
+    .AddOptions<LinkedInOptions>()
+    .Bind(builder.Configuration.GetSection(LinkedInOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<LinkedInOptions>>(
+    new OptionsValidatorAdapter<LinkedInOptions>(o => o.Validate()));
+builder.Services
     .AddOptions<BlogPromotionOptions>()
     .Bind(builder.Configuration.GetSection(BlogPromotionOptions.SectionName))
-    .Validate(options => string.IsNullOrWhiteSpace(options.Validate()), "Invalid blog promotion options")
     .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<BlogPromotionOptions>>(
+    new OptionsValidatorAdapter<BlogPromotionOptions>(o => o.Validate()));
 
 builder.Services
     .AddAuthentication(ApiKeyAuthHandler.SchemeName)
@@ -60,6 +70,26 @@ builder.Services.AddHttpClient<MastodonClient>((sp, client) =>
     client.BaseAddress = new Uri(mastodonOptions["InstanceUrl"] ?? "https://mastodon.social");
 });
 
+builder.Services.AddHttpClient<LinkedInClient>((sp, client) =>
+{
+    var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
+    client.BaseAddress = new Uri(linkedInOptions["ApiBaseUrl"] ?? "https://api.linkedin.com");
+});
+
+builder.Services.AddHttpClient<LinkedInTokenProvider>((sp, client) =>
+{
+    var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
+    client.BaseAddress = new Uri(linkedInOptions["OAuthBaseUrl"] ?? "https://www.linkedin.com");
+});
+
+builder.Services.AddHttpClient("LinkedInOAuth", (sp, client) =>
+{
+    var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
+    client.BaseAddress = new Uri(linkedInOptions["OAuthBaseUrl"] ?? "https://www.linkedin.com");
+});
+
+builder.Services.AddSingleton<ILinkedInTokenStore, AzureTableLinkedInTokenStore>();
+
 builder.Services.AddHttpClient<ImageDownloadService>();
 builder.Services.AddHttpClient<IBlogFeedReader, RssBlogFeedReader>();
 
@@ -67,6 +97,8 @@ builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
     sp.GetRequiredService<BlueskyClient>());
 builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
     sp.GetRequiredService<MastodonClient>());
+builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
+    sp.GetRequiredService<LinkedInClient>());
 builder.Services.AddSingleton<ITextShorteningService, TextShorteningService>();
 builder.Services.AddSingleton<IHashtagService, HashtagService>();
 builder.Services.AddSingleton<IImageDownloadService>(sp =>

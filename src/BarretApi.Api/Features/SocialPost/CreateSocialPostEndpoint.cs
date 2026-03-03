@@ -19,7 +19,7 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
             {
                 Text = "Hello from BarretApi! #dotnet #aspire",
                 Hashtags = ["webapi"],
-                Platforms = ["bluesky", "mastodon"],
+                Platforms = ["linkedin", "bluesky", "mastodon"],
                 Images =
                 [
                     new ImageAttachmentRequest
@@ -33,6 +33,14 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
             {
                 Results =
                 [
+                    new PlatformResult
+                    {
+                        Platform = "linkedin",
+                        Success = true,
+                        PostId = "urn:li:share:123456789",
+                        PostUrl = "https://www.linkedin.com/feed/update/urn%3Ali%3Ashare%3A123456789",
+                        ShortenedText = "Hello from BarretApi! #dotnet #aspire #webapi"
+                    },
                     new PlatformResult
                     {
                         Platform = "bluesky",
@@ -58,6 +66,13 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
                 [
                     new PlatformResult
                     {
+                        Platform = "linkedin",
+                        Success = false,
+                        Error = "LinkedIn API rejected the content",
+                        ErrorCode = "VALIDATION_FAILED"
+                    },
+                    new PlatformResult
+                    {
                         Platform = "bluesky",
                         Success = true,
                         PostId = "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -78,6 +93,13 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
             {
                 Results =
                 [
+                    new PlatformResult
+                    {
+                        Platform = "linkedin",
+                        Success = false,
+                        Error = "Authentication failed",
+                        ErrorCode = "AUTH_FAILED"
+                    },
                     new PlatformResult
                     {
                         Platform = "bluesky",

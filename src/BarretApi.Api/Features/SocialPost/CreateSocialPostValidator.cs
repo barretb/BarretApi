@@ -20,9 +20,10 @@ public sealed class CreateSocialPostValidator : Validator<CreateSocialPostReques
         RuleFor(x => x.Platforms)
             .Must(platforms => platforms!.All(p =>
                 p.Equals("bluesky", StringComparison.OrdinalIgnoreCase) ||
-                p.Equals("mastodon", StringComparison.OrdinalIgnoreCase)))
+                p.Equals("mastodon", StringComparison.OrdinalIgnoreCase) ||
+                p.Equals("linkedin", StringComparison.OrdinalIgnoreCase)))
             .When(x => x.Platforms is not null && x.Platforms.Count > 0)
-            .WithMessage("Platforms must be 'bluesky' or 'mastodon'.");
+            .WithMessage("Platforms must be 'bluesky', 'mastodon', or 'linkedin'.");
 
         RuleForEach(x => x.Images)
             .ChildRules(image =>

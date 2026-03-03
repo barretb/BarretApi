@@ -2,6 +2,28 @@
 
 ## API Endpoints
 
+### Create social post
+
+- Method: `POST`
+- Path: `/api/social-posts`
+- Auth header: `X-Api-Key: <value>`
+
+Supported platforms in `platforms`:
+
+- `bluesky`
+- `mastodon`
+- `linkedin`
+
+### LinkedIn configuration
+
+Configure these values in AppHost-managed configuration for environments that need LinkedIn posting:
+
+- `LinkedIn:AccessToken`
+- `LinkedIn:AuthorUrn`
+- `LinkedIn:ApiBaseUrl` (optional, defaults to `https://api.linkedin.com`)
+
+Use least-privilege LinkedIn app permissions, rotate access tokens regularly, and never log or return token values in API responses.
+
 ### Trigger RSS blog promotion
 
 - Method: `POST`
@@ -20,3 +42,9 @@ Example:
 curl -X POST "https://<your-api-host>/api/social-posts/rss-promotion" \
   -H "X-Api-Key: <api-key>"
 ```
+
+### LinkedIn rollout notes
+
+- Add LinkedIn values to deployment settings before enabling LinkedIn in client requests.
+- Validate with one `linkedin`-only request first, then test mixed-platform requests.
+- Confirm mixed-platform failure handling returns `207` when LinkedIn fails and another platform succeeds.
