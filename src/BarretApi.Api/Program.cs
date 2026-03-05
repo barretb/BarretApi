@@ -14,23 +14,6 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Temporary startup diagnostics (remove after debugging) ---
-Console.WriteLine("=== CONFIGURATION DIAGNOSTICS ===");
-Console.WriteLine($"LinkedIn:ClientId = '{builder.Configuration["LinkedIn:ClientId"]}'");
-Console.WriteLine($"LinkedIn:ClientSecret length = {builder.Configuration["LinkedIn:ClientSecret"]?.Length ?? 0}");
-Console.WriteLine($"LinkedIn:AuthorUrn = '{builder.Configuration["LinkedIn:AuthorUrn"]}'");
-Console.WriteLine($"LinkedIn:TokenStorage:TableName = '{builder.Configuration["LinkedIn:TokenStorage:TableName"]}'");
-Console.WriteLine($"LinkedIn:TokenStorage:ConnectionString length = {builder.Configuration["LinkedIn:TokenStorage:ConnectionString"]?.Length ?? 0}");
-Console.WriteLine($"LinkedIn:TokenStorage:AccountEndpoint = '{builder.Configuration["LinkedIn:TokenStorage:AccountEndpoint"]}'");
-Console.WriteLine("Environment variables containing 'LinkedIn' (case-insensitive):");
-foreach (var kvp in Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
-	.Where(e => e.Key.ToString()!.Contains("LinkedIn", StringComparison.OrdinalIgnoreCase)))
-{
-	Console.WriteLine($"  {kvp.Key} = (length: {kvp.Value?.ToString()?.Length ?? 0})");
-}
-Console.WriteLine("=== END DIAGNOSTICS ===");
-// --- End temporary diagnostics ---
-
 builder.AddServiceDefaults();
 
 builder.Services.AddCors(options =>
