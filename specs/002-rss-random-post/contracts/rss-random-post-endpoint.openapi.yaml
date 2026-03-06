@@ -1,0 +1,230 @@
+openapi: 3.0.3
+info:
+  title: BarretApi - RSS Random Post
+  version: "1.0"
+  description: Post a random entry from an RSS feed to social platforms.
+
+paths:
+  /api/social-posts/rss-random:
+    post:
+      operationId: rssRandomPost
+      summary: Post a random RSS feed entry
+      description: >
+        Fetches the RSS feed at the given URL, applies optional tag-exclusion
+        and recency filters, selects one entry at random, and posts it to the
+        targeted social platforms.
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RssRandomPostRequest"
+            example:
+              feedUrl: "https://example.com/blog/feed.xml"
+              platforms:
+                - bluesky
+                - mastodon
+              excludeTags:
+                - personal
+                - draft
+              maxAgeDays: 30
+      responses:
+        "200":
+          description: All targeted platforms succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RssRandomPostResponse"
+              example:
+                selectedTitle: "Building APIs with .NET Aspire"
+                selectedUrl: "https://example.com/blog/aspire-apis"
+                results:
+                  - platform: bluesky
+                    success: true
+                    postId: "at://did:plc:abc123/app.bsky.feed.post/xyz789"
+                    postUrl: "https://bsky.app/profile/handle.bsky.social/post/xyz789"
+                    shortenedText: "Building APIs with .NET Aspire\nhttps://example.com/blog/aspire-apis #dotnet #aspire"
+                  - platform: mastodon
+                    success: true
+                    postId: "109876543210"
+                    postUrl: "https://mastodon.social/@you/109876543210"
+                    shortenedText: "Building APIs with .NET Aspire\nhttps://example.com/blog/aspire-apis #dotnet #aspire"
+                postedAt: "2026-03-04T12:00:00+00:00"
+        "207":
+          description: Partial success — at least one platform succeeded and at least one failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RssRandomPostResponse"
+              example:
+                selectedTitle: "Building APIs with .NET Aspire"
+                selectedUrl: "https://example.com/blog/aspire-apis"
+                results:
+                  - platform: bluesky
+                    success: true
+                    postId: "at://did:plc:abc123/app.bsky.feed.post/xyz789"
+                    postUrl: "https://bsky.app/profile/handle.bsky.social/post/xyz789"
+                    shortenedText: "Building APIs with .NET Aspire\nhttps://example.com/blog/aspire-apis #dotnet #aspire"
+                  - platform: mastodon
+                    success: false
+                    error: "Authentication failed"
+                    errorCode: "AUTH_FAILED"
+                postedAt: "2026-03-04T12:00:00+00:00"
+        "400":
+          description: Request validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                statusCode: 400
+                message: "One or more validation errors occurred."
+                errors:
+                  feedUrl:
+                    - "Feed URL is required."
+        "401":
+          description: Missing or invalid X-Api-Key.
+        "422":
+          description: No eligible entries remain after filtering.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                statusCode: 422
+                message: "One or more errors occurred."
+                errors:
+                  generalErrors:
+                    - "No eligible entries remain after applying tag exclusion and recency filters."
+        "502":
+          description: Feed read failed or all platform posts failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RssRandomPostResponse"
+              example:
+                selectedTitle: "Building APIs with .NET Aspire"
+                selectedUrl: "https://example.com/blog/aspire-apis"
+                results:
+                  - platform: bluesky
+                    success: false
+                    error: "Rate limit exceeded"
+                    errorCode: "RATE_LIMITED"
+                  - platform: mastodon
+                    success: false
+                    error: "Service unavailable"
+                    errorCode: "PLATFORM_ERROR"
+                postedAt: "2026-03-04T12:00:00+00:00"
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+
+  schemas:
+    RssRandomPostRequest:
+      type: object
+      required:
+        - feedUrl
+      properties:
+        feedUrl:
+          type: string
+          format: uri
+          description: Absolute URL of the RSS/Atom feed to read.
+          example: "https://example.com/blog/feed.xml"
+        platforms:
+          type: array
+          items:
+            type: string
+            enum: [bluesky, mastodon, linkedin]
+          description: >
+            Platforms to post to. Defaults to all configured platforms
+            when omitted.
+          example: [bluesky, mastodon]
+        excludeTags:
+          type: array
+          items:
+            type: string
+          description: >
+            Tags to exclude. Entries with any of these tags (case-insensitive)
+            are not eligible for selection.
+          example: [personal, draft]
+        maxAgeDays:
+          type: integer
+          minimum: 1
+          description: >
+            Maximum age of eligible entries in days. Only entries published
+            within this many days are eligible. Omit for no time limit.
+          example: 30
+
+    RssRandomPostResponse:
+      type: object
+      required:
+        - selectedTitle
+        - selectedUrl
+        - results
+        - postedAt
+      properties:
+        selectedTitle:
+          type: string
+          description: Title of the randomly selected feed entry.
+          example: "Building APIs with .NET Aspire"
+        selectedUrl:
+          type: string
+          format: uri
+          description: Canonical URL of the randomly selected feed entry.
+          example: "https://example.com/blog/aspire-apis"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformResult"
+        postedAt:
+          type: string
+          format: date-time
+          description: UTC timestamp of when posting completed.
+
+    PlatformResult:
+      type: object
+      required:
+        - platform
+        - success
+      properties:
+        platform:
+          type: string
+          enum: [bluesky, mastodon, linkedin]
+        success:
+          type: boolean
+        postId:
+          type: string
+          description: Platform-specific post identifier (present on success).
+        postUrl:
+          type: string
+          format: uri
+          description: URL to the published post (present on success).
+        shortenedText:
+          type: string
+          description: Final text after processing (present on success).
+        error:
+          type: string
+          description: Human-readable error message (present on failure).
+        errorCode:
+          type: string
+          description: Machine-readable error code (present on failure).
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
