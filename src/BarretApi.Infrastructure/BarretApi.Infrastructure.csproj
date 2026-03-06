@@ -2,6 +2,7 @@
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="BarretApi.Api" />
+		<InternalsVisibleTo Include="BarretApi.Infrastructure.UnitTests" />
 	</ItemGroup>
 
 	<ItemGroup>

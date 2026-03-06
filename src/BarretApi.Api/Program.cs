@@ -106,6 +106,7 @@ builder.Services.AddSingleton<IImageDownloadService>(sp =>
 builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPromotionRepository>();
 builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
 builder.Services.AddSingleton<SocialPostService>();
+builder.Services.AddSingleton<RssRandomPostService>();
 
 var app = builder.Build();
 

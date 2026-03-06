@@ -23,8 +23,21 @@ public sealed class RssBlogFeedReader(
 	public async Task<IReadOnlyList<BlogFeedEntry>> ReadEntriesAsync(CancellationToken cancellationToken = default)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(_options.FeedUrl);
+		return await ReadEntriesAsync(_options.FeedUrl, cancellationToken);
+	}
 
-		using var stream = await _httpClient.GetStreamAsync(_options.FeedUrl, cancellationToken);
+	public async Task<IReadOnlyList<BlogFeedEntry>> ReadEntriesAsync(
+		string feedUrl,
+		CancellationToken cancellationToken = default)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(feedUrl);
+
+		using var stream = await _httpClient.GetStreamAsync(feedUrl, cancellationToken);
+		return ParseFeed(stream);
+	}
+
+	private IReadOnlyList<BlogFeedEntry> ParseFeed(Stream stream)
+	{
 		using var reader = XmlReader.Create(stream, new XmlReaderSettings
 		{
 			Async = true,
