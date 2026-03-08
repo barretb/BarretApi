@@ -12,6 +12,7 @@ public sealed class TriggerRssPromotionResponse
 	public int ReminderPostsSucceeded { get; init; }
 	public int EntriesSkippedAlreadyPosted { get; init; }
 	public int EntriesSkippedOutsideWindow { get; init; }
+	public int EntriesSkippedNoTags { get; init; }
 	public List<TriggerRssPromotionFailure> Failures { get; init; } = [];
 	public List<TriggerRssPromotionBlogPost> LastTwoBlogPosts { get; init; } = [];
 }

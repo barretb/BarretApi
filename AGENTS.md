@@ -173,6 +173,12 @@ dotnet test
 - Prefer Shouldly for assertions.
 - Avoid commercially licensed testing libraries (e.g. FluentAssertions, Moq)
 
+## Feature Completion
+
+- After all tasks for a feature are completed, update [README.md](README.md) to reflect the new feature
+- Include a description of what the feature does and how to use it (e.g. endpoint URL, request/response structure, example payloads)
+- Place new feature documentation in the appropriate section of the README, maintaining consistent formatting with existing entries
+
 ## Documentation Conventions
 
 - Use Markdown for all documentation files

@@ -81,6 +81,12 @@ public sealed class BlogPromotionOrchestrator(
 
 		foreach (var entry in feedEntries.OrderByDescending(e => e.PublishedAtUtc))
 		{
+			if (entry.Tags.Count == 0)
+			{
+				summary.EntriesSkippedNoTags++;
+				continue;
+			}
+
 			if (entry.PublishedAtUtc < cutoff)
 			{
 				summary.EntriesSkippedOutsideWindow++;

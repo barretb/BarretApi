@@ -22,6 +22,20 @@ public sealed class RssRandomPostService(
 		var eligible = entries.ToList();
 		_logger.LogInformation("Feed returned {TotalEntries} entries", eligible.Count);
 
+		{
+			var beforeCount = eligible.Count;
+			eligible = eligible
+				.Where(e => e.Tags.Count > 0)
+				.ToList();
+			if (beforeCount != eligible.Count)
+			{
+				_logger.LogInformation(
+					"No-tags filter removed {RemovedCount} entries, {RemainingCount} remaining",
+					beforeCount - eligible.Count,
+					eligible.Count);
+			}
+		}
+
 		if (query.ExcludeTags.Count > 0)
 		{
 			var beforeCount = eligible.Count;

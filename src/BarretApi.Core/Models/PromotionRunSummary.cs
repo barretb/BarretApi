@@ -28,6 +28,7 @@ public sealed class PromotionRunSummary
 	public int ReminderPostsSucceeded { get; set; }
 	public int EntriesSkippedAlreadyPosted { get; set; }
 	public int EntriesSkippedOutsideWindow { get; set; }
+	public int EntriesSkippedNoTags { get; set; }
 	public List<PromotionEntryFailure> Failures { get; init; } = [];
 	public List<RecentBlogPostDetails> LastTwoBlogPosts { get; init; } = [];
 }
