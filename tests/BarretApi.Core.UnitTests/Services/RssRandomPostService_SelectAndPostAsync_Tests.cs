@@ -154,7 +154,7 @@ public sealed class RssRandomPostService_SelectAndPostAsync_Tests
 				CanonicalUrl = "https://example.com/post-1",
 				Title = "My Great Post",
 				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
-				Tags = []
+				Tags = ["dotnet"]
 			}
 		};
 
@@ -212,7 +212,7 @@ public sealed class RssRandomPostService_PlatformTargeting_Tests
 			CanonicalUrl = "https://example.com/post-1",
 			Title = "Test Post",
 			PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
-			Tags = []
+			Tags = ["general"]
 		}
 	];
 
@@ -399,7 +399,7 @@ public sealed class RssRandomPostService_TagExclusion_Tests
 	}
 
 	[Fact]
-	public async Task DoesNotExcludeEntriesWithoutTags()
+	public async Task ExcludesEntriesWithoutTags()
 	{
 		var entriesWithUntagged = new List<BlogFeedEntry>
 		{
@@ -422,9 +422,10 @@ public sealed class RssRandomPostService_TagExclusion_Tests
 			ExcludeTags = ["personal"]
 		};
 
-		var result = await _sut.SelectAndPostAsync(query);
+		var ex = await Should.ThrowAsync<InvalidOperationException>(
+			() => _sut.SelectAndPostAsync(query));
 
-		result.SelectedEntry.EntryIdentity.ShouldBe("only-untagged");
+		ex.Message.ShouldContain("no eligible");
 	}
 
 	[Fact]
@@ -505,7 +506,72 @@ public sealed class RssRandomPostService_TagExclusion_Tests
 		var result = await _sut.SelectAndPostAsync(query);
 
 		result.SelectedEntry.ShouldNotBeNull();
-		TaggedEntries.ShouldContain(result.SelectedEntry);
+		result.SelectedEntry.Tags.Count.ShouldBeGreaterThan(0);
+	}
+
+	[Fact]
+	public async Task ThrowsInvalidOperation_GivenAllEntriesHaveNoTags()
+	{
+		var untaggedOnly = new List<BlogFeedEntry>
+		{
+			new()
+			{
+				EntryIdentity = "no-tags-1",
+				CanonicalUrl = "https://example.com/no-tags-1",
+				Title = "No Tags Post",
+				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+				Tags = []
+			}
+		};
+
+		_feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+			.Returns(untaggedOnly);
+
+		var query = new RssRandomPostQuery
+		{
+			FeedUrl = "https://example.com/feed.xml"
+		};
+
+		var ex = await Should.ThrowAsync<InvalidOperationException>(
+			() => _sut.SelectAndPostAsync(query));
+
+		ex.Message.ShouldContain("no eligible");
+	}
+
+	[Fact]
+	public async Task SelectsOnlyTaggedEntry_GivenMixOfTaggedAndUntaggedEntries()
+	{
+		var mixed = new List<BlogFeedEntry>
+		{
+			new()
+			{
+				EntryIdentity = "tagged",
+				CanonicalUrl = "https://example.com/tagged",
+				Title = "Tagged Post",
+				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+				Tags = ["dotnet"]
+			},
+			new()
+			{
+				EntryIdentity = "untagged",
+				CanonicalUrl = "https://example.com/untagged",
+				Title = "Untagged Post",
+				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-2),
+				Tags = []
+			}
+		};
+
+		_feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+			.Returns(mixed);
+
+		var query = new RssRandomPostQuery
+		{
+			FeedUrl = "https://example.com/feed.xml"
+		};
+
+		var result = await _sut.SelectAndPostAsync(query);
+
+		result.SelectedEntry.EntryIdentity.ShouldBe("tagged");
 	}
 
 	[Fact]
@@ -617,7 +683,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
 				CanonicalUrl = "https://example.com/recent",
 				Title = "Recent Post",
 				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-3),
-				Tags = []
+				Tags = ["dotnet"]
 			},
 			new()
 			{
@@ -625,7 +691,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
 				CanonicalUrl = "https://example.com/old",
 				Title = "Old Post",
 				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-30),
-				Tags = []
+				Tags = ["dotnet"]
 			}
 		};
 
@@ -654,7 +720,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
 				CanonicalUrl = "https://example.com/recent",
 				Title = "Recent Post",
 				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-3),
-				Tags = []
+				Tags = ["dotnet"]
 			},
 			new()
 			{
@@ -662,7 +728,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
 				CanonicalUrl = "https://example.com/ancient",
 				Title = "Ancient Post",
 				PublishedAtUtc = DateTimeOffset.MinValue,
-				Tags = []
+				Tags = ["dotnet"]
 			}
 		};
 
@@ -691,7 +757,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
 				CanonicalUrl = "https://example.com/old",
 				Title = "Old Post",
 				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-30),
-				Tags = []
+				Tags = ["dotnet"]
 			}
 		};
 
@@ -721,7 +787,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
 				CanonicalUrl = "https://example.com/very-old",
 				Title = "Very Old Post",
 				PublishedAtUtc = DateTimeOffset.UtcNow.AddDays(-365),
-				Tags = []
+				Tags = ["archive"]
 			}
 		};
 

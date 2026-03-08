@@ -61,6 +61,7 @@ public sealed class TriggerRssPromotionEndpoint(
 				ReminderPostsSucceeded = 0,
 				EntriesSkippedAlreadyPosted = 0,
 				EntriesSkippedOutsideWindow = 0,
+				EntriesSkippedNoTags = 0,
 				Failures =
 				[
 					new TriggerRssPromotionFailure
@@ -94,6 +95,7 @@ public sealed class TriggerRssPromotionEndpoint(
 			ReminderPostsSucceeded = summary.ReminderPostsSucceeded,
 			EntriesSkippedAlreadyPosted = summary.EntriesSkippedAlreadyPosted,
 			EntriesSkippedOutsideWindow = summary.EntriesSkippedOutsideWindow,
+			EntriesSkippedNoTags = summary.EntriesSkippedNoTags,
 			LastTwoBlogPosts = summary.LastTwoBlogPosts.Select(p => new TriggerRssPromotionBlogPost
 			{
 				EntryIdentity = p.EntryIdentity,
