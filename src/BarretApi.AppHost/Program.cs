@@ -18,6 +18,14 @@ var blogPromotionReminderDelayHours = builder.AddParameter("blog-promotion-remin
 var blogPromotionTableStorageTableName = builder.AddParameter("blog-promotion-table-storage-table-name");
 var blogPromotionTableStoragePartitionKey = builder.AddParameter("blog-promotion-table-storage-partition-key");
 var nasaApodApiKey = builder.AddParameter("nasa-apod-api-key", secret: true);
+var gibsBaseUrl = builder.AddParameter("gibs-base-url");
+var gibsDefaultLayer = builder.AddParameter("gibs-default-layer");
+var gibsBboxSouth = builder.AddParameter("gibs-bbox-south");
+var gibsBboxWest = builder.AddParameter("gibs-bbox-west");
+var gibsBboxNorth = builder.AddParameter("gibs-bbox-north");
+var gibsBboxEast = builder.AddParameter("gibs-bbox-east");
+var gibsImageWidth = builder.AddParameter("gibs-image-width");
+var gibsImageHeight = builder.AddParameter("gibs-image-height");
 
 var azurite = builder.AddContainer("azurite", "mcr.microsoft.com/azure-storage/azurite")
     .WithArgs("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0")
@@ -50,6 +58,14 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("BlogPromotion__TableStorage__ConnectionString", azuriteConnectionString)
     .WithEnvironment("BlogPromotion__TableStorage__TableName", blogPromotionTableStorageTableName)
     .WithEnvironment("BlogPromotion__TableStorage__PartitionKey", blogPromotionTableStoragePartitionKey)
-    .WithEnvironment("NasaApod__ApiKey", nasaApodApiKey);
+    .WithEnvironment("NasaApod__ApiKey", nasaApodApiKey)
+    .WithEnvironment("NasaGibs__BaseUrl", gibsBaseUrl)
+    .WithEnvironment("NasaGibs__DefaultLayer", gibsDefaultLayer)
+    .WithEnvironment("NasaGibs__BboxSouth", gibsBboxSouth)
+    .WithEnvironment("NasaGibs__BboxWest", gibsBboxWest)
+    .WithEnvironment("NasaGibs__BboxNorth", gibsBboxNorth)
+    .WithEnvironment("NasaGibs__BboxEast", gibsBboxEast)
+    .WithEnvironment("NasaGibs__ImageWidth", gibsImageWidth)
+    .WithEnvironment("NasaGibs__ImageHeight", gibsImageHeight);
 
 builder.Build().Run();

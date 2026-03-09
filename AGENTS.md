@@ -91,6 +91,18 @@ namespace MyProject.Feature   // ❌ Avoid
 - Do not add `User Secrets` to any project in a solution other than the Aspire AppHost. Use the `User Secrets` in the Aspire AppHost for sensitive data in development
 - Never hardcode sensitive information in source code
 
+### Configuration Documentation
+
+When documenting configuration parameters in README.md or other documentation:
+
+- Always include all three naming forms for each parameter:
+  - **Config Key**: Colon-separated (e.g., `Section:Setting`), used in `IOptions<T>` and `appsettings.json`
+  - **Aspire Parameter**: Kebab-case (e.g., `section-setting`), used in `builder.AddParameter()` and User Secrets
+  - **Environment Variable**: Double-underscore separated (e.g., `Section__Setting`), used in `.WithEnvironment()`, Azure App Service, and containers
+- Use `—` when a parameter is not mapped at a particular level (e.g., hardcoded values, options-only defaults)
+- Use consistent table column order: Config Key | Aspire Parameter | Environment Variable | Required | Default | Description
+- Omit the Default column for tables where all values are required
+
 ## Logging
 
 - Use `Microsoft.Extensions.Logging` for logging

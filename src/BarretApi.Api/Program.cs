@@ -120,6 +120,17 @@ builder.Services.AddSingleton<INasaApodClient>(sp => sp.GetRequiredService<NasaA
 builder.Services.AddSingleton<IImageResizer, SkiaImageResizer>();
 builder.Services.AddSingleton<NasaApodPostService>();
 
+builder.Services.Configure<NasaGibsOptions>(builder.Configuration.GetSection(NasaGibsOptions.SectionName));
+builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
+{
+	var gibsOptions = builder.Configuration.GetSection(NasaGibsOptions.SectionName);
+	client.BaseAddress = new Uri(
+		gibsOptions["BaseUrl"] ?? "https://wvs.earthdata.nasa.gov");
+	client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddSingleton<INasaGibsClient>(sp => sp.GetRequiredService<NasaGibsClient>());
+builder.Services.AddSingleton<NasaGibsPostService>();
+
 var app = builder.Build();
 
 app.UseCors();

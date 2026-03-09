@@ -1,0 +1,314 @@
+openapi: 3.0.3
+info:
+  title: BarretApi — NASA GIBS Ohio Satellite Image Social Posting
+  description: |
+    Endpoint for fetching satellite imagery of Ohio from NASA's GIBS Worldview
+    Snapshot API and posting it to social media platforms with a descriptive
+    caption, NASA acknowledgement, and interactive Worldview link.
+  version: 1.0.0
+
+paths:
+  /api/social-posts/ohio-satellite:
+    post:
+      operationId: postOhioSatellite
+      summary: Post Ohio satellite image to social platforms
+      description: |
+        Fetches a satellite image of Ohio from NASA GIBS (for yesterday or a
+        specified date) using the Worldview Snapshot API and posts it to the
+        selected social media platforms. The JPEG snapshot image is attached,
+        with a NASA Worldview interactive link included in the post text. The
+        post includes NASA GIBS acknowledgement. Images exceeding platform
+        size limits are automatically resized to JPEG via SkiaSharp.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OhioSatellitePostRequest'
+            examples:
+              recentAllPlatforms:
+                summary: Post yesterday's Ohio satellite image to all platforms
+                value:
+                  {}
+              specificDateAndLayer:
+                summary: Post a specific date's image using VIIRS SNPP layer to Bluesky and Mastodon
+                value:
+                  date: "2026-02-14"
+                  layer: "VIIRS_SNPP_CorrectedReflectance_TrueColor"
+                  platforms:
+                    - bluesky
+                    - mastodon
+              customLayer:
+                summary: Post with a specific layer to all platforms
+                value:
+                  layer: "MODIS_Aqua_CorrectedReflectance_TrueColor"
+      responses:
+        '200':
+          description: All targeted platforms succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OhioSatellitePostResponse'
+              examples:
+                success:
+                  summary: Successful post to two platforms
+                  value:
+                    date: "2026-03-08"
+                    layer: "MODIS_Terra_CorrectedReflectance_TrueColor"
+                    worldviewUrl: "https://worldview.earthdata.nasa.gov/?v=-84.82,38.40,-80.52,42.32&l=MODIS_Terra_CorrectedReflectance_TrueColor&t=2026-03-08"
+                    imageWidth: 1024
+                    imageHeight: 768
+                    imageAttached: true
+                    imageResized: false
+                    results:
+                      - platform: bluesky
+                        success: true
+                        postId: "at://did:plc:abc123/app.bsky.feed.post/xyz789"
+                        postUrl: "https://bsky.app/profile/user/post/xyz789"
+                        shortenedText: null
+                        error: null
+                        errorCode: null
+                      - platform: mastodon
+                        success: true
+                        postId: "109876543210"
+                        postUrl: "https://mastodon.social/@user/109876543210"
+                        shortenedText: null
+                        error: null
+                        errorCode: null
+                    postedAt: "2026-03-08T15:30:00Z"
+        '207':
+          description: Partial success — some platforms succeeded, some failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OhioSatellitePostResponse'
+              examples:
+                partialSuccess:
+                  summary: Bluesky succeeded, Mastodon failed
+                  value:
+                    date: "2026-03-08"
+                    layer: "MODIS_Terra_CorrectedReflectance_TrueColor"
+                    worldviewUrl: "https://worldview.earthdata.nasa.gov/?v=-84.82,38.40,-80.52,42.32&l=MODIS_Terra_CorrectedReflectance_TrueColor&t=2026-03-08"
+                    imageWidth: 1024
+                    imageHeight: 768
+                    imageAttached: true
+                    imageResized: false
+                    results:
+                      - platform: bluesky
+                        success: true
+                        postId: "at://did:plc:abc123/app.bsky.feed.post/xyz789"
+                        postUrl: "https://bsky.app/profile/user/post/xyz789"
+                        shortenedText: null
+                        error: null
+                        errorCode: null
+                      - platform: mastodon
+                        success: false
+                        postId: null
+                        postUrl: null
+                        shortenedText: null
+                        error: "Unauthorized: Invalid access token"
+                        errorCode: "AUTH_FAILED"
+                    postedAt: "2026-03-08T15:30:00Z"
+        '400':
+          description: Request validation failed (invalid date, unsupported layer, unknown platform).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidDate:
+                  summary: Future date provided
+                  value:
+                    statusCode: 400
+                    message: "Validation failed"
+                    errors:
+                      date:
+                        - "Date must not be in the future."
+                unsupportedLayer:
+                  summary: Invalid layer identifier
+                  value:
+                    statusCode: 400
+                    message: "Validation failed"
+                    errors:
+                      layer:
+                        - "Layer 'INVALID_LAYER' is not supported. Supported layers: MODIS_Terra_CorrectedReflectance_TrueColor, MODIS_Aqua_CorrectedReflectance_TrueColor, VIIRS_SNPP_CorrectedReflectance_TrueColor, VIIRS_NOAA20_CorrectedReflectance_TrueColor, VIIRS_NOAA21_CorrectedReflectance_TrueColor."
+        '401':
+          description: Missing or invalid X-Api-Key header.
+        '422':
+          description: NASA GIBS API returned an error or snapshot could not be fetched.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                gibsApiError:
+                  summary: GIBS returned an XML error
+                  value:
+                    statusCode: 422
+                    message: "Failed to fetch snapshot from NASA GIBS"
+                    error: "GIBS snapshot returned an error: ServiceException code='LayerNotDefined'"
+        '502':
+          description: All targeted platforms failed to post.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OhioSatellitePostResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+
+  schemas:
+    OhioSatellitePostRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          nullable: true
+          description: |
+            Imagery date in YYYY-MM-DD format. Defaults to yesterday (UTC) if
+            omitted, since satellite imagery typically has a 1–2 day processing
+            delay. Must not be in the future. Must not be before the selected
+            layer's earliest available date.
+          example: "2026-03-08"
+        layer:
+          type: string
+          nullable: true
+          description: |
+            GIBS imagery layer identifier. Defaults to the configured default
+            layer (MODIS_Terra_CorrectedReflectance_TrueColor) if omitted. Must
+            be one of the supported layers.
+          enum:
+            - MODIS_Terra_CorrectedReflectance_TrueColor
+            - MODIS_Aqua_CorrectedReflectance_TrueColor
+            - VIIRS_SNPP_CorrectedReflectance_TrueColor
+            - VIIRS_NOAA20_CorrectedReflectance_TrueColor
+            - VIIRS_NOAA21_CorrectedReflectance_TrueColor
+          example: "MODIS_Terra_CorrectedReflectance_TrueColor"
+        platforms:
+          type: array
+          nullable: true
+          description: |
+            Target social media platforms. If omitted or empty, posts to all
+            configured platforms.
+          items:
+            type: string
+            enum:
+              - bluesky
+              - mastodon
+              - linkedin
+          example:
+            - bluesky
+            - mastodon
+
+    OhioSatellitePostResponse:
+      type: object
+      required:
+        - date
+        - layer
+        - worldviewUrl
+        - imageWidth
+        - imageHeight
+        - imageAttached
+        - imageResized
+        - results
+        - postedAt
+      properties:
+        date:
+          type: string
+          format: date
+          description: Imagery date.
+          example: "2026-03-08"
+        layer:
+          type: string
+          description: GIBS imagery layer identifier used.
+          example: "MODIS_Terra_CorrectedReflectance_TrueColor"
+        worldviewUrl:
+          type: string
+          format: uri
+          description: NASA Worldview interactive link showing the same Ohio view.
+          example: "https://worldview.earthdata.nasa.gov/?v=-84.82,38.40,-80.52,42.32&l=MODIS_Terra_CorrectedReflectance_TrueColor&t=2026-03-08"
+        imageWidth:
+          type: integer
+          description: Width of the snapshot image in pixels.
+          example: 1024
+        imageHeight:
+          type: integer
+          description: Height of the snapshot image in pixels.
+          example: 768
+        imageAttached:
+          type: boolean
+          description: Whether the satellite image was attached to the posts.
+          example: true
+        imageResized:
+          type: boolean
+          description: Whether the image was resized to fit platform limits.
+          example: false
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformResult'
+        postedAt:
+          type: string
+          format: date-time
+          description: Timestamp of the posting operation.
+          example: "2026-03-08T15:30:00Z"
+
+    PlatformResult:
+      type: object
+      required:
+        - platform
+        - success
+      properties:
+        platform:
+          type: string
+          description: Platform name.
+          example: "bluesky"
+        success:
+          type: boolean
+          description: Whether the post succeeded.
+          example: true
+        postId:
+          type: string
+          nullable: true
+          description: Platform-specific post identifier.
+        postUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL of the published post.
+        shortenedText:
+          type: string
+          nullable: true
+          description: The shortened text that was posted (if text was shortened).
+        error:
+          type: string
+          nullable: true
+          description: Error message if the post failed.
+        errorCode:
+          type: string
+          nullable: true
+          description: Error code if the post failed.
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        error:
+          type: string
+          nullable: true
