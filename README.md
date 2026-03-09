@@ -11,6 +11,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [POST /api/social-posts — Create Social Post (JSON)](#post-apisocial-posts--create-social-post-json)
   - [POST /api/social-posts/upload — Create Social Post (Multipart Upload)](#post-apisocial-postsupload--create-social-post-multipart-upload)
   - [POST /api/social-posts/rss-promotion — Trigger RSS Blog Promotion](#post-apisocial-postsrss-promotion--trigger-rss-blog-promotion)
+  - [POST /api/social-posts/nasa-apod — Post NASA APOD to Social Platforms](#post-apisocial-postsnasa-apod--post-nasa-apod-to-social-platforms)
   - [GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow](#get-apilinkedinauth--initiate-linkedin-oauth-flow)
   - [GET /api/linkedin/auth/callback — LinkedIn OAuth Callback](#get-apilinkedinauthcallback--linkedin-oauth-callback)
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
@@ -91,46 +92,49 @@ Creates a cross-platform social post. Images are supplied as URL references and 
 
 #### Example — Post to All Platforms
 
-```bash
-curl -X POST "https://<your-api-host>/api/social-posts" \
-  -H "X-Api-Key: <api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Hello from BarretApi! #dotnet #aspire",
-    "hashtags": ["webapi"],
-    "platforms": ["linkedin", "bluesky", "mastodon"],
-    "images": [
-      {
-        "url": "https://example.com/photo.jpg",
-        "altText": "A descriptive alt text for the image"
-      }
-    ]
-  }'
+```http
+POST /api/social-posts
+```
+
+```json
+{
+  "text": "Hello from BarretApi! #dotnet #aspire",
+  "hashtags": ["webapi"],
+  "platforms": ["linkedin", "bluesky", "mastodon"],
+  "images": [
+    {
+      "url": "https://example.com/photo.jpg",
+      "altText": "A descriptive alt text for the image"
+    }
+  ]
+}
 ```
 
 #### Example — Post to a Single Platform
 
-```bash
-curl -X POST "https://<your-api-host>/api/social-posts" \
-  -H "X-Api-Key: <api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Just shipped a new feature!",
-    "platforms": ["bluesky"]
-  }'
+```http
+POST /api/social-posts
+```
+
+```json
+{
+  "text": "Just shipped a new feature!",
+  "platforms": ["bluesky"]
+}
 ```
 
 #### Example — Text-Only Post with Hashtags
 
-```bash
-curl -X POST "https://<your-api-host>/api/social-posts" \
-  -H "X-Api-Key: <api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Exploring the new .NET 10 features today",
-    "hashtags": ["dotnet", "csharp", "aspire"],
-    "platforms": ["bluesky", "mastodon"]
-  }'
+```http
+POST /api/social-posts
+```
+
+```json
+{
+  "text": "Exploring the new .NET 10 features today",
+  "hashtags": ["dotnet", "csharp", "aspire"],
+  "platforms": ["bluesky", "mastodon"]
+}
 ```
 
 #### Response — 200 OK (All Platforms Succeeded)
@@ -244,31 +248,32 @@ Creates a cross-platform social post with images uploaded as files via `multipar
 
 #### Example — Upload with Images
 
-```bash
-curl -X POST "https://<your-api-host>/api/social-posts/upload" \
-  -H "X-Api-Key: <api-key>" \
-  -F "text=Check out this screenshot!" \
-  -F "hashtags=dotnet" \
-  -F "hashtags=aspire" \
-  -F "platforms=bluesky" \
-  -F "platforms=mastodon" \
-  -F "images=@./screenshot.png" \
-  -F "altTexts=Screenshot of the new dashboard"
+```http
+POST /api/social-posts/upload
+Content-Type: multipart/form-data
 ```
+
+| Field | Value |
+|---|---|
+| `text` | `Check out this screenshot!` |
+| `hashtags` | `dotnet`, `aspire` |
+| `platforms` | `bluesky`, `mastodon` |
+| `images` | `screenshot.png` |
+| `altTexts` | `Screenshot of the new dashboard` |
 
 #### Example — Multiple Images
 
-```bash
-curl -X POST "https://<your-api-host>/api/social-posts/upload" \
-  -H "X-Api-Key: <api-key>" \
-  -F "text=Before and after comparison" \
-  -F "platforms=bluesky" \
-  -F "platforms=linkedin" \
-  -F "images=@./before.jpg" \
-  -F "images=@./after.jpg" \
-  -F "altTexts=Before the refactor" \
-  -F "altTexts=After the refactor"
+```http
+POST /api/social-posts/upload
+Content-Type: multipart/form-data
 ```
+
+| Field | Value |
+|---|---|
+| `text` | `Before and after comparison` |
+| `platforms` | `bluesky`, `linkedin` |
+| `images` | `before.jpg`, `after.jpg` |
+| `altTexts` | `Before the refactor`, `After the refactor` |
 
 #### Response
 
@@ -295,10 +300,11 @@ Reads the configured RSS feed, posts newly published entries first, then posts a
 
 #### Example
 
-```bash
-curl -X POST "https://<your-api-host>/api/social-posts/rss-promotion" \
-  -H "X-Api-Key: <api-key>"
+```http
+POST /api/social-posts/rss-promotion
 ```
+
+No request body. The endpoint reads its RSS feed configuration from the server.
 
 #### Response — 200 OK
 
@@ -371,6 +377,132 @@ curl -X POST "https://<your-api-host>/api/social-posts/rss-promotion" \
 
 ---
 
+### POST /api/social-posts/nasa-apod — Post NASA APOD to Social Platforms
+
+Fetches the NASA Astronomy Picture of the Day and posts it to selected social media platforms. Supports image and video APODs, with automatic image resizing and copyright attribution.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `date` | `string` | No | Date in `YYYY-MM-DD` format. Defaults to today. Must be between `1995-06-16` and today. |
+| `platforms` | `string[]` | No | Target platforms: `bluesky`, `mastodon`, `linkedin`. Defaults to all configured. |
+
+#### Example — Post Today's APOD to All Platforms
+
+```http
+POST /api/social-posts/nasa-apod
+```
+
+```json
+{}
+```
+
+#### Example — Post a Specific Date to Selected Platforms
+
+```http
+POST /api/social-posts/nasa-apod
+```
+
+```json
+{
+  "date": "2026-02-14",
+  "platforms": ["bluesky", "mastodon"]
+}
+```
+
+#### Response — 200 OK (All Platforms Succeeded)
+
+```json
+{
+  "title": "The Aurora Tree",
+  "date": "2026-03-08",
+  "mediaType": "image",
+  "imageUrl": "https://apod.nasa.gov/apod/image/2603/AuroraTree_Wallace_960.jpg",
+  "hdImageUrl": "https://apod.nasa.gov/apod/image/2603/AuroraTree_Wallace_2048.jpg",
+  "copyright": "Alyn Wallace",
+  "imageAttached": true,
+  "imageResized": false,
+  "results": [
+    {
+      "platform": "bluesky",
+      "success": true,
+      "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+      "postUrl": "https://bsky.app/profile/user/post/xyz789"
+    },
+    {
+      "platform": "mastodon",
+      "success": true,
+      "postId": "109876543210",
+      "postUrl": "https://mastodon.social/@user/109876543210"
+    }
+  ],
+  "postedAt": "2026-03-08T15:30:00Z"
+}
+```
+
+#### Response — 207 Multi-Status (Partial Success)
+
+```json
+{
+  "title": "The Aurora Tree",
+  "date": "2026-03-08",
+  "mediaType": "image",
+  "imageUrl": "https://apod.nasa.gov/apod/image/2603/AuroraTree_Wallace_960.jpg",
+  "imageAttached": true,
+  "imageResized": false,
+  "results": [
+    {
+      "platform": "bluesky",
+      "success": true,
+      "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+      "postUrl": "https://bsky.app/profile/user/post/xyz789"
+    },
+    {
+      "platform": "mastodon",
+      "success": false,
+      "error": "Rate limit exceeded",
+      "errorCode": "RATE_LIMITED"
+    }
+  ],
+  "postedAt": "2026-03-08T15:30:00Z"
+}
+```
+
+#### Response — 422 Unprocessable Entity (NASA API Error)
+
+```json
+{
+  "statusCode": 422,
+  "message": "Failed to fetch APOD from NASA API: Response status code does not indicate success: 429 (Too Many Requests)."
+}
+```
+
+#### Behavior Details
+
+- **Image APOD**: Downloads the image, uses the APOD `explanation` field as alt text, attaches the image to the post. The HD image URL is included in the post text.
+- **Video APOD**: Uses the video thumbnail as the post image if available; otherwise posts text-only with the video URL.
+- **Copyright**: If the APOD has a copyright holder, a `Credit: {holder}` line is appended to the post text.
+- **Image Resizing**: Images are automatically resized to fit each platform's limits using a quality-first strategy (JPEG quality 85→45), falling back to dimension reduction if needed.
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **200** | All targeted platforms succeeded. |
+| **207** | Partial success — at least one platform succeeded and at least one failed. |
+| **400** | Request validation failed (invalid date format, date out of range, invalid platform). |
+| **401** | Missing or invalid `X-Api-Key`. |
+| **422** | NASA API returned an error or the APOD could not be fetched. |
+| **502** | All targeted platforms failed. |
+
+---
+
 ### GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow
 
 Starts the LinkedIn OAuth 2.0 authorization flow. Open this URL directly in a **browser** to be redirected to LinkedIn's consent screen. When called from a non-browser API client, returns a JSON object with the authorization URL.
@@ -391,9 +523,9 @@ You will be redirected to LinkedIn to authorize the application.
 
 #### Example — API Client
 
-```bash
-curl "https://<your-api-host>/api/linkedin/auth" \
-  -H "Accept: application/json"
+```http
+GET /api/linkedin/auth
+Accept: application/json
 ```
 
 #### Response — 200 OK (API Client)
@@ -466,8 +598,8 @@ Returns your LinkedIn profile info, including the member URN (`sub`) needed for 
 
 #### Example
 
-```bash
-curl "https://<your-api-host>/api/linkedin/profile"
+```http
+GET /api/linkedin/profile
 ```
 
 #### Response — 200 OK
@@ -546,6 +678,13 @@ All configuration is managed through the **Aspire AppHost** project. Do not add 
 | `BlogPromotion:TableStorage:AccountEndpoint` | No | — | Azure Table Storage account endpoint (used when ConnectionString is not set). |
 | `BlogPromotion:TableStorage:TableName` | No | `blogpostpromotions` | Table name for promotion tracking records. |
 | `BlogPromotion:TableStorage:PartitionKey` | No | `blog-promotion` | Partition key for promotion records. |
+
+### NASA APOD
+
+| Key | Required | Default | Description |
+|---|---|---|---|
+| `NasaApod:ApiKey` | Yes | — | NASA API key. Register free at <https://api.nasa.gov/>. |
+| `NasaApod:BaseUrl` | No | `https://api.nasa.gov/planetary/apod` | NASA APOD API base URL. |
 
 ## Production Notes
 

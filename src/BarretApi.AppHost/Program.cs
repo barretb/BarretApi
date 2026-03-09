@@ -17,6 +17,7 @@ var blogPromotionEnableReminderPosts = builder.AddParameter("blog-promotion-enab
 var blogPromotionReminderDelayHours = builder.AddParameter("blog-promotion-reminder-delay-hours");
 var blogPromotionTableStorageTableName = builder.AddParameter("blog-promotion-table-storage-table-name");
 var blogPromotionTableStoragePartitionKey = builder.AddParameter("blog-promotion-table-storage-partition-key");
+var nasaApodApiKey = builder.AddParameter("nasa-apod-api-key", secret: true);
 
 var azurite = builder.AddContainer("azurite", "mcr.microsoft.com/azure-storage/azurite")
     .WithArgs("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0")
@@ -48,6 +49,7 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("BlogPromotion__ReminderDelayHours", blogPromotionReminderDelayHours)
     .WithEnvironment("BlogPromotion__TableStorage__ConnectionString", azuriteConnectionString)
     .WithEnvironment("BlogPromotion__TableStorage__TableName", blogPromotionTableStorageTableName)
-    .WithEnvironment("BlogPromotion__TableStorage__PartitionKey", blogPromotionTableStoragePartitionKey);
+    .WithEnvironment("BlogPromotion__TableStorage__PartitionKey", blogPromotionTableStoragePartitionKey)
+    .WithEnvironment("NasaApod__ApiKey", nasaApodApiKey);
 
 builder.Build().Run();

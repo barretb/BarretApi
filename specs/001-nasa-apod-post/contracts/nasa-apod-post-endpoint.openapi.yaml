@@ -1,0 +1,264 @@
+openapi: 3.0.3
+info:
+  title: BarretApi — NASA APOD Social Posting
+  description: Endpoint for fetching NASA Astronomy Picture of the Day and posting to social media platforms.
+  version: 1.0.0
+
+paths:
+  /api/social-posts/nasa-apod:
+    post:
+      operationId: postNasaApod
+      summary: Post NASA APOD to social platforms
+      description: |
+        Fetches the NASA Astronomy Picture of the Day (for today or a specified date)
+        and posts it to the selected social media platforms. The standard-resolution
+        image is attached, with the HD image link included in the post text. The APOD
+        explanation is used as the image alt text. Images exceeding platform size limits
+        are automatically resized to JPEG.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NasaApodPostRequest'
+            examples:
+              todayAllPlatforms:
+                summary: Post today's APOD to all platforms
+                value:
+                  {}
+              specificDate:
+                summary: Post a specific date's APOD to Bluesky and Mastodon
+                value:
+                  date: "2026-02-14"
+                  platforms:
+                    - bluesky
+                    - mastodon
+      responses:
+        '200':
+          description: All targeted platforms succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NasaApodPostResponse'
+              examples:
+                success:
+                  summary: Successful post to two platforms
+                  value:
+                    title: "The Aurora Tree"
+                    date: "2026-03-08"
+                    mediaType: "image"
+                    imageUrl: "https://apod.nasa.gov/apod/image/2603/AuroraTree_Wallace_960.jpg"
+                    hdImageUrl: "https://apod.nasa.gov/apod/image/2603/AuroraTree_Wallace_2048.jpg"
+                    copyright: "Alyn Wallace"
+                    imageAttached: true
+                    imageResized: false
+                    results:
+                      - platform: bluesky
+                        success: true
+                        postId: "at://did:plc:abc123/app.bsky.feed.post/xyz789"
+                        postUrl: "https://bsky.app/profile/user/post/xyz789"
+                        shortenedText: null
+                        error: null
+                        errorCode: null
+                      - platform: mastodon
+                        success: true
+                        postId: "109876543210"
+                        postUrl: "https://mastodon.social/@user/109876543210"
+                        shortenedText: null
+                        error: null
+                        errorCode: null
+                    postedAt: "2026-03-08T15:30:00Z"
+        '207':
+          description: Partial success — some platforms succeeded, some failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NasaApodPostResponse'
+        '400':
+          description: Request validation failed (invalid date format, unknown platform, etc.).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidDate:
+                  summary: Future date provided
+                  value:
+                    statusCode: 400
+                    message: "Validation failed"
+                    errors:
+                      date:
+                        - "Date must not be in the future."
+        '401':
+          description: Missing or invalid X-Api-Key header.
+        '422':
+          description: NASA API returned an error or the APOD could not be fetched.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                nasaApiError:
+                  summary: NASA API failure
+                  value:
+                    statusCode: 422
+                    message: "Failed to fetch APOD from NASA API"
+                    error: "NASA API returned status 429: OVER_RATE_LIMIT"
+        '502':
+          description: All targeted platforms failed to post.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NasaApodPostResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+
+  schemas:
+    NasaApodPostRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          nullable: true
+          description: |
+            APOD date in YYYY-MM-DD format. Defaults to today if omitted.
+            Must be between 1995-06-16 and today (inclusive).
+          example: "2026-03-08"
+        platforms:
+          type: array
+          nullable: true
+          description: |
+            Target social media platforms. If omitted or empty, posts to all
+            configured platforms.
+          items:
+            type: string
+            enum:
+              - bluesky
+              - mastodon
+              - linkedin
+          example:
+            - bluesky
+            - mastodon
+
+    NasaApodPostResponse:
+      type: object
+      required:
+        - title
+        - date
+        - mediaType
+        - imageUrl
+        - imageAttached
+        - imageResized
+        - results
+        - postedAt
+      properties:
+        title:
+          type: string
+          description: APOD title.
+          example: "The Aurora Tree"
+        date:
+          type: string
+          format: date
+          description: APOD date.
+          example: "2026-03-08"
+        mediaType:
+          type: string
+          enum:
+            - image
+            - video
+          description: Whether the APOD is an image or video.
+          example: "image"
+        imageUrl:
+          type: string
+          format: uri
+          description: Standard-resolution image URL used for the attachment.
+          example: "https://apod.nasa.gov/apod/image/2603/AuroraTree_Wallace_960.jpg"
+        hdImageUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: HD image URL included in the post text (null if unavailable).
+          example: "https://apod.nasa.gov/apod/image/2603/AuroraTree_Wallace_2048.jpg"
+        copyright:
+          type: string
+          nullable: true
+          description: Copyright holder, if the image is not public domain.
+          example: "Alyn Wallace"
+        imageAttached:
+          type: boolean
+          description: Whether an image was attached to the posts.
+          example: true
+        imageResized:
+          type: boolean
+          description: Whether the image was resized to fit platform limits.
+          example: false
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformResult'
+        postedAt:
+          type: string
+          format: date-time
+          description: Timestamp of the posting operation.
+          example: "2026-03-08T15:30:00Z"
+
+    PlatformResult:
+      type: object
+      required:
+        - platform
+        - success
+      properties:
+        platform:
+          type: string
+          description: Platform name.
+          example: "bluesky"
+        success:
+          type: boolean
+          description: Whether the post succeeded.
+          example: true
+        postId:
+          type: string
+          nullable: true
+          description: Platform-specific post identifier.
+        postUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL of the published post.
+        shortenedText:
+          type: string
+          nullable: true
+          description: The shortened text that was posted (if text was shortened).
+        error:
+          type: string
+          nullable: true
+          description: Error message if the post failed.
+        errorCode:
+          type: string
+          nullable: true
+          description: Error code if the post failed.
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        error:
+          type: string
+          nullable: true
