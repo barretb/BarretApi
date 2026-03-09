@@ -6,6 +6,7 @@ using BarretApi.Core.Services;
 using BarretApi.Infrastructure.Bluesky;
 using BarretApi.Infrastructure.LinkedIn;
 using BarretApi.Infrastructure.Mastodon;
+using BarretApi.Infrastructure.Nasa;
 using BarretApi.Infrastructure.Services;
 using FastEndpoints;
 using FastEndpoints.Swagger;
@@ -107,6 +108,17 @@ builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPr
 builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
 builder.Services.AddSingleton<SocialPostService>();
 builder.Services.AddSingleton<RssRandomPostService>();
+
+builder.Services.Configure<NasaApodOptions>(builder.Configuration.GetSection(NasaApodOptions.SectionName));
+builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
+{
+	var nasaOptions = builder.Configuration.GetSection(NasaApodOptions.SectionName);
+	client.BaseAddress = new Uri(nasaOptions["BaseUrl"] ?? "https://api.nasa.gov");
+	client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddSingleton<INasaApodClient>(sp => sp.GetRequiredService<NasaApodClient>());
+builder.Services.AddSingleton<IImageResizer, SkiaImageResizer>();
+builder.Services.AddSingleton<NasaApodPostService>();
 
 var app = builder.Build();
 
