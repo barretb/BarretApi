@@ -12,7 +12,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [POST /api/social-posts/upload — Create Social Post (Multipart Upload)](#post-apisocial-postsupload--create-social-post-multipart-upload)
   - [POST /api/social-posts/rss-promotion — Trigger RSS Blog Promotion](#post-apisocial-postsrss-promotion--trigger-rss-blog-promotion)
   - [POST /api/social-posts/nasa-apod — Post NASA APOD to Social Platforms](#post-apisocial-postsnasa-apod--post-nasa-apod-to-social-platforms)
-  - [POST /api/social-posts/ohio-satellite — Post Ohio Satellite Image](#post-apisocial-postsohio-satellite--post-ohio-satellite-image)
+  - [POST /api/social-posts/satellite — Post Satellite Image](#post-apisocial-postssatellite--post-satellite-image)
   - [GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow](#get-apilinkedinauth--initiate-linkedin-oauth-flow)
   - [GET /api/linkedin/auth/callback — LinkedIn OAuth Callback](#get-apilinkedinauthcallback--linkedin-oauth-callback)
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
@@ -504,9 +504,9 @@ POST /api/social-posts/nasa-apod
 
 ---
 
-### POST /api/social-posts/ohio-satellite — Post Ohio Satellite Image
+### POST /api/social-posts/satellite — Post Satellite Image
 
-Fetches a satellite image of Ohio from NASA GIBS (Global Imagery Browse Services) and posts it to selected social media platforms. The image is captured from the Worldview Snapshot API using configurable satellite imagery layers and date.
+Fetches a satellite image from NASA GIBS (Global Imagery Browse Services) and posts it to selected social media platforms. The image is captured from the Worldview Snapshot API using configurable satellite imagery layers and date.
 
 | Detail | Value |
 |---|---|
@@ -520,6 +520,14 @@ Fetches a satellite image of Ohio from NASA GIBS (Global Imagery Browse Services
 | `date` | `string` | No | Date in `YYYY-MM-DD` format. Defaults to yesterday (UTC). Must not be before the selected layer's start date or in the future. |
 | `layer` | `string` | No | Satellite imagery layer. Defaults to `MODIS_Terra_CorrectedReflectance_TrueColor`. See supported layers below. |
 | `platforms` | `string[]` | No | Target platforms: `bluesky`, `mastodon`, `linkedin`. Defaults to all configured. |
+| `title` | `string` | No | Custom title for the post caption. Defaults to `"Satellite view of Ohio"` (configurable default). Max 200 characters. |
+| `description` | `string` | No | Custom alt text for the image. Defaults to auto-generated text with date and layer. Max 1000 characters. |
+| `bboxSouth` | `number` | No | Southern boundary latitude (-90 to 90). Defaults to `38.40`. Must be less than `bboxNorth`. |
+| `bboxWest` | `number` | No | Western boundary longitude (-180 to 180). Defaults to `-84.82`. Must be less than `bboxEast`. |
+| `bboxNorth` | `number` | No | Northern boundary latitude (-90 to 90). Defaults to `42.32`. Must be greater than `bboxSouth`. |
+| `bboxEast` | `number` | No | Eastern boundary longitude (-180 to 180). Defaults to `-80.52`. Must be greater than `bboxWest`. |
+| `imageWidth` | `integer` | No | Snapshot image width in pixels (1–8192). Defaults to `1024`. |
+| `imageHeight` | `integer` | No | Snapshot image height in pixels (1–8192). Defaults to `768`. |
 
 #### Supported Layers
 
@@ -534,7 +542,7 @@ Fetches a satellite image of Ohio from NASA GIBS (Global Imagery Browse Services
 #### Example — Post Yesterday's Image with Defaults
 
 ```http
-POST /api/social-posts/ohio-satellite
+POST /api/social-posts/satellite
 ```
 
 ```json
@@ -544,7 +552,7 @@ POST /api/social-posts/ohio-satellite
 #### Example — Post a Specific Date and Layer
 
 ```http
-POST /api/social-posts/ohio-satellite
+POST /api/social-posts/satellite
 ```
 
 ```json
@@ -555,13 +563,38 @@ POST /api/social-posts/ohio-satellite
 }
 ```
 
+#### Example — Post a Custom Region (Grand Canyon)
+
+```http
+POST /api/social-posts/satellite
+```
+
+```json
+{
+  "title": "Satellite view of the Grand Canyon",
+  "description": "Aerial satellite image of the Grand Canyon, Arizona, captured by NASA GIBS.",
+  "bboxSouth": 35.9,
+  "bboxWest": -112.6,
+  "bboxNorth": 36.5,
+  "bboxEast": -111.6,
+  "imageWidth": 1280,
+  "imageHeight": 960,
+  "platforms": ["bluesky"]
+}
+```
+
 #### Response — 200 OK (All Platforms Succeeded)
 
 ```json
 {
   "date": "2026-03-15",
   "layer": "MODIS_Terra_CorrectedReflectance_TrueColor",
+  "title": "Satellite view of Ohio",
   "worldviewUrl": "https://worldview.earthdata.nasa.gov/?v=-84.82,38.40,-80.52,42.32&l=MODIS_Terra_CorrectedReflectance_TrueColor&t=2026-03-15",
+  "bboxSouth": 38.40,
+  "bboxWest": -84.82,
+  "bboxNorth": 42.32,
+  "bboxEast": -80.52,
   "imageWidth": 1024,
   "imageHeight": 768,
   "imageAttached": true,
@@ -596,9 +629,12 @@ POST /api/social-posts/ohio-satellite
 #### Behavior Details
 
 - **Default Date**: Uses yesterday's date (UTC) when no date is specified, since same-day imagery may not yet be available.
-- **Image Attachment**: The GIBS snapshot (JPEG, typically 80–400 KB at 1024×768) is attached directly to the social post.
-- **Post Caption**: Includes the date, layer name, a Worldview link for interactive exploration, and NASA GIBS acknowledgement.
-- **Hashtags**: Posts include `#Ohio`, `#satellite`, `#NASA`, and `#EarthObservation`.
+- **Custom Region**: Override `bboxSouth`, `bboxWest`, `bboxNorth`, and `bboxEast` to capture any geographic region. Defaults to a preconfigured bounding box.
+- **Custom Dimensions**: Override `imageWidth` and `imageHeight` (1–8192) to control the snapshot resolution. Defaults to 1024×768.
+- **Image Attachment**: The GIBS snapshot (JPEG, typically 80–400 KB at default resolution) is attached directly to the social post.
+- **Post Caption**: Includes the title (customizable), date, layer name, a Worldview link for interactive exploration, and NASA GIBS acknowledgement.
+- **Alt Text**: Uses `description` if provided; otherwise auto-generates alt text from the date and layer.
+- **Hashtags**: Posts include `#satellite`, `#NASA`, and `#EarthObservation`.
 - **Worldview Link**: Each post includes a link to NASA Worldview showing the same view, allowing viewers to explore the imagery interactively.
 - **No API Key Required**: NASA GIBS is publicly accessible — no NASA API key is needed.
 
@@ -623,7 +659,7 @@ All GIBS parameters have sensible defaults and are configured in the Aspire AppH
 |---|---|
 | **200** | All targeted platforms succeeded. |
 | **207** | Partial success — at least one platform succeeded and at least one failed. |
-| **400** | Request validation failed (invalid date, unsupported layer, invalid platform). |
+| **400** | Request validation failed (invalid date, unsupported layer, invalid platform, bbox out of range, image dimensions out of range, title/description too long). |
 | **401** | Missing or invalid `X-Api-Key`. |
 | **422** | NASA GIBS returned an error or the snapshot could not be fetched. |
 | **502** | All targeted platforms failed. |

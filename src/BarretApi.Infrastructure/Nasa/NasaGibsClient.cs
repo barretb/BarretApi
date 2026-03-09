@@ -16,11 +16,10 @@ public sealed class NasaGibsClient(
 	private readonly ILogger<NasaGibsClient> _logger = logger;
 
 	public async Task<GibsSnapshotEntry> GetSnapshotAsync(
-		string layer,
-		DateOnly date,
+		GibsSnapshotRequest request,
 		CancellationToken cancellationToken = default)
 	{
-		var requestUrl = BuildRequestUrl(layer, date);
+		var requestUrl = BuildRequestUrl(request);
 		_logger.LogInformation("Fetching GIBS snapshot from {Url}", requestUrl);
 
 		var response = await _httpClient.GetAsync(requestUrl, cancellationToken);
@@ -40,32 +39,32 @@ public sealed class NasaGibsClient(
 
 		_logger.LogInformation(
 			"Fetched GIBS snapshot: {Layer} {Date}, {ByteCount} bytes, {ContentType}",
-			layer,
-			date,
+			request.Layer,
+			request.Date,
 			imageBytes.Length,
 			contentType);
 
 		return new GibsSnapshotEntry(
 			imageBytes,
-			date,
-			layer,
-			_options.ImageWidth,
-			_options.ImageHeight,
+			request.Date,
+			request.Layer,
+			request.ImageWidth,
+			request.ImageHeight,
 			contentType);
 	}
 
-	private string BuildRequestUrl(string layer, DateOnly date)
+	private string BuildRequestUrl(GibsSnapshotRequest request)
 	{
 		return $"{_options.BaseUrl}" +
 			$"?REQUEST=GetSnapshot" +
 			$"&SERVICE=WMS" +
-			$"&LAYERS={Uri.EscapeDataString(layer)}" +
+			$"&LAYERS={Uri.EscapeDataString(request.Layer)}" +
 			$"&CRS=EPSG:4326" +
-			$"&BBOX={_options.BboxSouth},{_options.BboxWest},{_options.BboxNorth},{_options.BboxEast}" +
+			$"&BBOX={request.BboxSouth},{request.BboxWest},{request.BboxNorth},{request.BboxEast}" +
 			$"&FORMAT=image/jpeg" +
-			$"&WIDTH={_options.ImageWidth}" +
-			$"&HEIGHT={_options.ImageHeight}" +
-			$"&TIME={date:yyyy-MM-dd}";
+			$"&WIDTH={request.ImageWidth}" +
+			$"&HEIGHT={request.ImageHeight}" +
+			$"&TIME={request.Date:yyyy-MM-dd}";
 	}
 
 	private static string ExtractErrorMessage(string body)

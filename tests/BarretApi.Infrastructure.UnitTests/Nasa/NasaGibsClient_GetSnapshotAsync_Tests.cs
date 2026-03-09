@@ -1,5 +1,6 @@
 using System.Net;
 using BarretApi.Core.Configuration;
+using BarretApi.Core.Models;
 using BarretApi.Infrastructure.Nasa;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,6 +24,27 @@ public sealed class NasaGibsClient_GetSnapshotAsync_Tests
 		return new NasaGibsClient(httpClient, _options, _logger);
 	}
 
+	private static GibsSnapshotRequest CreateRequest(
+		string layer = "MODIS_Terra_CorrectedReflectance_TrueColor",
+		DateOnly? date = null,
+		double bboxSouth = 38.4,
+		double bboxWest = -84.82,
+		double bboxNorth = 42.32,
+		double bboxEast = -80.52,
+		int imageWidth = 1024,
+		int imageHeight = 768)
+	{
+		return new GibsSnapshotRequest(
+			layer,
+			date ?? new DateOnly(2026, 3, 7),
+			bboxSouth,
+			bboxWest,
+			bboxNorth,
+			bboxEast,
+			imageWidth,
+			imageHeight);
+	}
+
 	[Fact]
 	public async Task ReturnsGibsSnapshotEntry_GivenSuccessfulJpegResponse()
 	{
@@ -40,9 +62,7 @@ public sealed class NasaGibsClient_GetSnapshotAsync_Tests
 		};
 		var sut = CreateClient(httpClient);
 
-		var result = await sut.GetSnapshotAsync(
-			"MODIS_Terra_CorrectedReflectance_TrueColor",
-			new DateOnly(2026, 3, 7));
+		var result = await sut.GetSnapshotAsync(CreateRequest());
 
 		result.ShouldNotBeNull();
 		result.ImageBytes.ShouldBe(imageBytes);
@@ -75,7 +95,7 @@ public sealed class NasaGibsClient_GetSnapshotAsync_Tests
 		var sut = CreateClient(httpClient);
 
 		var ex = await Should.ThrowAsync<InvalidOperationException>(
-			() => sut.GetSnapshotAsync("INVALID_LAYER", new DateOnly(2026, 3, 7)));
+			() => sut.GetSnapshotAsync(CreateRequest(layer: "INVALID_LAYER")));
 
 		ex.Message.ShouldContain("GIBS snapshot returned an error");
 		ex.Message.ShouldContain("ServiceException");
@@ -93,9 +113,7 @@ public sealed class NasaGibsClient_GetSnapshotAsync_Tests
 		var sut = CreateClient(httpClient);
 
 		await Should.ThrowAsync<HttpRequestException>(
-			() => sut.GetSnapshotAsync(
-				"MODIS_Terra_CorrectedReflectance_TrueColor",
-				new DateOnly(2026, 3, 7)));
+			() => sut.GetSnapshotAsync(CreateRequest()));
 	}
 
 	[Fact]
@@ -115,9 +133,9 @@ public sealed class NasaGibsClient_GetSnapshotAsync_Tests
 		};
 		var sut = CreateClient(httpClient);
 
-		await sut.GetSnapshotAsync(
-			"VIIRS_SNPP_CorrectedReflectance_TrueColor",
-			new DateOnly(2026, 2, 14));
+		await sut.GetSnapshotAsync(CreateRequest(
+			layer: "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+			date: new DateOnly(2026, 2, 14)));
 
 		var url = handler.LastRequest!.RequestUri!.ToString();
 		url.ShouldContain("REQUEST=GetSnapshot");
@@ -145,9 +163,7 @@ public sealed class NasaGibsClient_GetSnapshotAsync_Tests
 		var sut = CreateClient(httpClient);
 
 		var ex = await Should.ThrowAsync<InvalidOperationException>(
-			() => sut.GetSnapshotAsync(
-				"MODIS_Terra_CorrectedReflectance_TrueColor",
-				new DateOnly(2026, 3, 7)));
+			() => sut.GetSnapshotAsync(CreateRequest()));
 
 		ex.Message.ShouldContain("GIBS snapshot returned an error");
 	}
@@ -167,9 +183,7 @@ public sealed class NasaGibsClient_GetSnapshotAsync_Tests
 		var sut = CreateClient(httpClient);
 
 		var ex = await Should.ThrowAsync<InvalidOperationException>(
-			() => sut.GetSnapshotAsync(
-				"MODIS_Terra_CorrectedReflectance_TrueColor",
-				new DateOnly(2026, 3, 7)));
+			() => sut.GetSnapshotAsync(CreateRequest()));
 
 		ex.Message.ShouldContain("unexpected HTML response");
 		ex.Message.ShouldContain("Verify the configured base URL");

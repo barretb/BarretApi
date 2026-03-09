@@ -17,25 +17,50 @@ public class NasaGibsPostService(
 	private readonly NasaGibsOptions _options = options.Value;
 	private readonly ILogger<NasaGibsPostService> _logger = logger;
 
-	public virtual async Task<OhioSatellitePostResult> PostAsync(
+	public virtual async Task<SatellitePostResult> PostAsync(
 		DateOnly? date,
 		string? layer,
+		string? title,
+		string? description,
+		double? bboxSouth,
+		double? bboxWest,
+		double? bboxNorth,
+		double? bboxEast,
+		int? imageWidth,
+		int? imageHeight,
 		IReadOnlyList<string> platforms,
 		CancellationToken cancellationToken = default)
 	{
 		var resolvedDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
 		var resolvedLayer = layer ?? _options.DefaultLayer;
+		var resolvedTitle = title ?? "Satellite view of Ohio";
+		var resolvedSouth = bboxSouth ?? _options.BboxSouth;
+		var resolvedWest = bboxWest ?? _options.BboxWest;
+		var resolvedNorth = bboxNorth ?? _options.BboxNorth;
+		var resolvedEast = bboxEast ?? _options.BboxEast;
+		var resolvedWidth = imageWidth ?? _options.ImageWidth;
+		var resolvedHeight = imageHeight ?? _options.ImageHeight;
 
 		_logger.LogInformation(
 			"Fetching GIBS snapshot for date {Date}, layer {Layer}",
 			resolvedDate.ToString("yyyy-MM-dd"),
 			resolvedLayer);
 
-		var snapshot = await _nasaGibsClient.GetSnapshotAsync(resolvedLayer, resolvedDate, cancellationToken);
+		var snapshotRequest = new GibsSnapshotRequest(
+			resolvedLayer,
+			resolvedDate,
+			resolvedSouth,
+			resolvedWest,
+			resolvedNorth,
+			resolvedEast,
+			resolvedWidth,
+			resolvedHeight);
 
-		var worldviewUrl = BuildWorldviewUrl(resolvedLayer, resolvedDate);
-		var postText = BuildPostText(resolvedDate, resolvedLayer, worldviewUrl);
-		var altText = BuildAltText(resolvedDate, resolvedLayer);
+		var snapshot = await _nasaGibsClient.GetSnapshotAsync(snapshotRequest, cancellationToken);
+
+		var worldviewUrl = BuildWorldviewUrl(resolvedLayer, resolvedDate, resolvedSouth, resolvedWest, resolvedNorth, resolvedEast);
+		var postText = BuildPostText(resolvedTitle, resolvedDate, resolvedLayer, worldviewUrl);
+		var altText = description ?? BuildAltText(resolvedDate, resolvedLayer);
 
 		_logger.LogInformation(
 			"Posting GIBS snapshot to {PlatformCount} platform(s), image size: {ImageSize} bytes",
@@ -45,7 +70,7 @@ public class NasaGibsPostService(
 		var socialPost = new SocialPost
 		{
 			Text = postText,
-			Hashtags = ["#Ohio", "#satellite", "#NASA", "#EarthObservation"],
+			Hashtags = ["#satellite", "#NASA", "#EarthObservation"],
 			Images =
 			[
 				new ImageData
@@ -53,7 +78,7 @@ public class NasaGibsPostService(
 					Content = snapshot.ImageBytes,
 					ContentType = snapshot.ContentType,
 					AltText = altText,
-					FileName = $"ohio-satellite-{resolvedDate:yyyy-MM-dd}.jpg"
+					FileName = $"satellite-{resolvedDate:yyyy-MM-dd}.jpg"
 				}
 			],
 			TargetPlatforms = platforms.ToList()
@@ -61,10 +86,15 @@ public class NasaGibsPostService(
 
 		var platformResults = await _socialPostService.PostAsync(socialPost, cancellationToken);
 
-		return new OhioSatellitePostResult(
+		return new SatellitePostResult(
 			Date: resolvedDate,
 			Layer: resolvedLayer,
+			Title: resolvedTitle,
 			WorldviewUrl: worldviewUrl,
+			BboxSouth: resolvedSouth,
+			BboxWest: resolvedWest,
+			BboxNorth: resolvedNorth,
+			BboxEast: resolvedEast,
 			ImageWidth: snapshot.Width,
 			ImageHeight: snapshot.Height,
 			ImageAttached: true,
@@ -72,17 +102,17 @@ public class NasaGibsPostService(
 			PlatformResults: platformResults);
 	}
 
-	private string BuildWorldviewUrl(string layer, DateOnly date)
+	private static string BuildWorldviewUrl(string layer, DateOnly date, double south, double west, double north, double east)
 	{
 		return $"https://worldview.earthdata.nasa.gov/" +
-			$"?v={_options.BboxWest},{_options.BboxSouth},{_options.BboxEast},{_options.BboxNorth}" +
+			$"?v={west},{south},{east},{north}" +
 			$"&l={layer}" +
 			$"&t={date:yyyy-MM-dd}";
 	}
 
-	private static string BuildPostText(DateOnly date, string layer, string worldviewUrl)
+	private static string BuildPostText(string title, DateOnly date, string layer, string worldviewUrl)
 	{
-		return $"Satellite view of Ohio \u2014 {date:yyyy-MM-dd}\n" +
+		return $"{title} \u2014 {date:yyyy-MM-dd}\n" +
 			$"Imagery: {layer}\n" +
 			$"{worldviewUrl}\n\n" +
 			"Imagery: NASA GIBS";

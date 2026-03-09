@@ -8,7 +8,7 @@ namespace BarretApi.Core.Interfaces;
 public interface INasaGibsClient
 {
 	/// <summary>
-	/// Fetches a snapshot image of Ohio for the given layer and date.
+	/// Fetches a snapshot image for the given request parameters.
 	/// </summary>
-	Task<GibsSnapshotEntry> GetSnapshotAsync(string layer, DateOnly date, CancellationToken cancellationToken = default);
+	Task<GibsSnapshotEntry> GetSnapshotAsync(GibsSnapshotRequest request, CancellationToken cancellationToken = default);
 }

@@ -59,12 +59,11 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 		var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(null, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.Date.ShouldBe(yesterday);
 		await _gibsClient.Received(1).GetSnapshotAsync(
-			Arg.Any<string>(),
-			yesterday,
+			Arg.Is<GibsSnapshotRequest>(r => r.Date == yesterday),
 			Arg.Any<CancellationToken>());
 	}
 
@@ -73,12 +72,11 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 	{
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(null, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.Layer.ShouldBe(_options.DefaultLayer);
 		await _gibsClient.Received(1).GetSnapshotAsync(
-			_options.DefaultLayer,
-			Arg.Any<DateOnly>(),
+			Arg.Is<GibsSnapshotRequest>(r => r.Layer == _options.DefaultLayer),
 			Arg.Any<CancellationToken>());
 	}
 
@@ -87,7 +85,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 	{
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(null, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.WorldviewUrl.ShouldContain($"?v={_options.BboxWest},{_options.BboxSouth},{_options.BboxEast},{_options.BboxNorth}");
 		result.WorldviewUrl.ShouldStartWith("https://worldview.earthdata.nasa.gov/");
@@ -107,7 +105,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 				return new PlatformPostResult { Platform = "bluesky", Success = true, PublishedText = text };
 			});
 
-		var result = await _sut.PostAsync(date, layer, ["bluesky"], CancellationToken.None);
+		var result = await _sut.PostAsync(date, layer, null, null, null, null, null, null, null, null, ["bluesky"], CancellationToken.None);
 
 		var publishedText = result.PlatformResults[0].PublishedText!;
 		publishedText.ShouldContain("2026-03-15");
@@ -131,7 +129,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 				return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage.AltText };
 			});
 
-		await _sut.PostAsync(date, layer, ["bluesky"], CancellationToken.None);
+		await _sut.PostAsync(date, layer, null, null, null, null, null, null, null, null, ["bluesky"], CancellationToken.None);
 
 		capturedImage.ShouldNotBeNull();
 		capturedImage!.AltText.ShouldContain("2026-03-15");
@@ -153,7 +151,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 				return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage.AltText };
 			});
 
-		await _sut.PostAsync(null, null, ["bluesky"], CancellationToken.None);
+		await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, ["bluesky"], CancellationToken.None);
 
 		capturedImage.ShouldNotBeNull();
 		capturedImage!.Content.ShouldBe(imageBytes);
@@ -165,7 +163,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 	{
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(null, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.PlatformResults.Count.ShouldBe(2);
 		result.PlatformResults.ShouldContain(r => r.Platform == "bluesky");
@@ -177,7 +175,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 	{
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(null, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.ImageAttached.ShouldBeTrue();
 		result.ImageResized.ShouldBeFalse();
@@ -186,11 +184,11 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 	[Fact]
 	public async Task PropagatesException_GivenGibsClientFailure()
 	{
-		_gibsClient.GetSnapshotAsync(Arg.Any<string>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>())
+		_gibsClient.GetSnapshotAsync(Arg.Any<GibsSnapshotRequest>(), Arg.Any<CancellationToken>())
 			.ThrowsAsync(new InvalidOperationException("GIBS returned error"));
 
 		await Should.ThrowAsync<InvalidOperationException>(
-			() => _sut.PostAsync(null, null, [], CancellationToken.None));
+			() => _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, [], CancellationToken.None));
 	}
 
 	// --- US2: Date-specific tests ---
@@ -201,11 +199,10 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 		var date = new DateOnly(2026, 2, 14);
 		SetupGibsClient();
 
-		await _sut.PostAsync(date, null, [], CancellationToken.None);
+		await _sut.PostAsync(date, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		await _gibsClient.Received(1).GetSnapshotAsync(
-			Arg.Any<string>(),
-			date,
+			Arg.Is<GibsSnapshotRequest>(r => r.Date == date),
 			Arg.Any<CancellationToken>());
 	}
 
@@ -215,7 +212,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 		var date = new DateOnly(2026, 2, 14);
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(date, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(date, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.WorldviewUrl.ShouldContain("&t=2026-02-14");
 	}
@@ -226,7 +223,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 		var date = new DateOnly(2026, 2, 14);
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(date, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(date, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.Date.ShouldBe(date);
 	}
@@ -239,11 +236,10 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 		var layer = "VIIRS_SNPP_CorrectedReflectance_TrueColor";
 		SetupGibsClient();
 
-		await _sut.PostAsync(null, layer, [], CancellationToken.None);
+		await _sut.PostAsync(null, layer, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		await _gibsClient.Received(1).GetSnapshotAsync(
-			layer,
-			Arg.Any<DateOnly>(),
+			Arg.Is<GibsSnapshotRequest>(r => r.Layer == layer),
 			Arg.Any<CancellationToken>());
 	}
 
@@ -253,7 +249,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 		var layer = "VIIRS_SNPP_CorrectedReflectance_TrueColor";
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(null, layer, [], CancellationToken.None);
+		var result = await _sut.PostAsync(null, layer, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.WorldviewUrl.ShouldContain($"&l={layer}");
 	}
@@ -263,7 +259,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 	{
 		SetupGibsClient();
 
-		var result = await _sut.PostAsync(null, null, [], CancellationToken.None);
+		var result = await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
 		result.Layer.ShouldBe("MODIS_Terra_CorrectedReflectance_TrueColor");
 	}
@@ -271,7 +267,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 	private void SetupGibsClient(byte[]? imageBytes = null)
 	{
 		var bytes = imageBytes ?? [0xFF, 0xD8, 0xFF, 0xE0];
-		_gibsClient.GetSnapshotAsync(Arg.Any<string>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>())
+		_gibsClient.GetSnapshotAsync(Arg.Any<GibsSnapshotRequest>(), Arg.Any<CancellationToken>())
 			.Returns(new GibsSnapshotEntry(bytes, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), "MODIS_Terra_CorrectedReflectance_TrueColor", 1024, 768, "image/jpeg"));
 	}
 

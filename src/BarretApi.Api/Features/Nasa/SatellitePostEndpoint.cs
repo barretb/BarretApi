@@ -6,20 +6,20 @@ using Microsoft.Extensions.Logging;
 
 namespace BarretApi.Api.Features.Nasa;
 
-public sealed class OhioSatellitePostEndpoint(
+public sealed class SatellitePostEndpoint(
 	NasaGibsPostService nasaGibsPostService,
-	ILogger<OhioSatellitePostEndpoint> logger)
-	: Endpoint<OhioSatellitePostRequest, OhioSatellitePostResponse>
+	ILogger<SatellitePostEndpoint> logger)
+	: Endpoint<SatellitePostRequest, SatellitePostResponse>
 {
 	public override void Configure()
 	{
-		Post("/api/social-posts/ohio-satellite");
+		Post("/api/social-posts/satellite");
 
 		Summary(s =>
 		{
-			s.Summary = "Post Ohio satellite image to social platforms";
-			s.Description = "Fetches a satellite image of Ohio from NASA GIBS and posts it to selected social media platforms.";
-			s.ExampleRequest = new OhioSatellitePostRequest
+			s.Summary = "Post satellite image to social platforms";
+			s.Description = "Fetches a satellite image from NASA GIBS and posts it to selected social media platforms.";
+			s.ExampleRequest = new SatellitePostRequest
 			{
 				Date = "2026-03-08",
 				Layer = "MODIS_Terra_CorrectedReflectance_TrueColor",
@@ -34,20 +34,32 @@ public sealed class OhioSatellitePostEndpoint(
 		});
 	}
 
-	public override async Task HandleAsync(OhioSatellitePostRequest req, CancellationToken ct)
+	public override async Task HandleAsync(SatellitePostRequest req, CancellationToken ct)
 	{
 		logger.LogInformation(
-			"Ohio satellite post request received for date {Date}, layer {Layer}",
+			"Satellite post request received for date {Date}, layer {Layer}",
 			req.Date ?? "default",
 			req.Layer ?? "default");
 
 		var date = ParseDate(req.Date);
 		var platforms = req.Platforms ?? [];
 
-		OhioSatellitePostResult result;
+		SatellitePostResult result;
 		try
 		{
-			result = await nasaGibsPostService.PostAsync(date, req.Layer, platforms, ct);
+			result = await nasaGibsPostService.PostAsync(
+				date,
+				req.Layer,
+				req.Title,
+				req.Description,
+				req.BboxSouth,
+				req.BboxWest,
+				req.BboxNorth,
+				req.BboxEast,
+				req.ImageWidth,
+				req.ImageHeight,
+				platforms,
+				ct);
 		}
 		catch (InvalidOperationException ex)
 		{
@@ -59,7 +71,7 @@ public sealed class OhioSatellitePostEndpoint(
 
 		var response = BuildResponse(result);
 		var statusCode = DetermineStatusCode(result.PlatformResults);
-		logger.LogInformation("Ohio satellite post completed with status {StatusCode}", statusCode);
+		logger.LogInformation("Satellite post completed with status {StatusCode}", statusCode);
 
 		await Send.ResponseAsync(response, statusCode, ct);
 	}
@@ -76,13 +88,18 @@ public sealed class OhioSatellitePostEndpoint(
 			: null;
 	}
 
-	private static OhioSatellitePostResponse BuildResponse(OhioSatellitePostResult result)
+	private static SatellitePostResponse BuildResponse(SatellitePostResult result)
 	{
-		return new OhioSatellitePostResponse
+		return new SatellitePostResponse
 		{
 			Date = result.Date.ToString("yyyy-MM-dd"),
 			Layer = result.Layer,
+			Title = result.Title,
 			WorldviewUrl = result.WorldviewUrl,
+			BboxSouth = result.BboxSouth,
+			BboxWest = result.BboxWest,
+			BboxNorth = result.BboxNorth,
+			BboxEast = result.BboxEast,
 			ImageWidth = result.ImageWidth,
 			ImageHeight = result.ImageHeight,
 			ImageAttached = result.ImageAttached,
