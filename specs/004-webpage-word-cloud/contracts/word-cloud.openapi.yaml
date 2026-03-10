@@ -1,0 +1,148 @@
+openapi: 3.0.3
+info:
+  title: BarretApi Word Cloud Endpoint
+  version: 1.0.0
+  description: Generate a word cloud PNG image from the text content of a web page.
+paths:
+  /api/word-cloud:
+    post:
+      summary: Generate word cloud from web page
+      description: |
+        Accepts a URL to a web page, fetches and parses the HTML to extract
+        visible text content, removes common English stop words, counts word
+        frequencies, and returns a PNG word cloud image where word size is
+        proportional to frequency.
+      operationId: generateWordCloud
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateWordCloudRequest'
+            examples:
+              defaultDimensions:
+                summary: Generate with default dimensions (800x600)
+                value:
+                  url: "https://example.com/article"
+              customDimensions:
+                summary: Generate with custom dimensions
+                value:
+                  url: "https://example.com/article"
+                  width: 1200
+                  height: 800
+      responses:
+        '200':
+          description: Word cloud image generated successfully
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Request validation failed (malformed URL, invalid dimensions)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                invalidUrl:
+                  value:
+                    statusCode: 400
+                    message: "One or more validation errors occurred."
+                    errors:
+                      url:
+                        - "The URL must be a valid absolute HTTP or HTTPS URL."
+                invalidDimensions:
+                  value:
+                    statusCode: 400
+                    message: "One or more validation errors occurred."
+                    errors:
+                      width:
+                        - "Width must be between 200 and 2000 pixels."
+                      height:
+                        - "Height must be between 200 and 2000 pixels."
+        '401':
+          description: Missing or invalid API key
+        '422':
+          description: Page fetched but insufficient text content for word cloud generation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                insufficientText:
+                  value:
+                    statusCode: 422
+                    message: "The page contains insufficient text content to generate a word cloud."
+        '502':
+          description: Failed to fetch the target web page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unreachable:
+                  value:
+                    statusCode: 502
+                    message: "Failed to fetch the web page. The target URL is unreachable or returned an error."
+                notHtml:
+                  value:
+                    statusCode: 502
+                    message: "The target URL did not return HTML content."
+                timeout:
+                  value:
+                    statusCode: 502
+                    message: "The request to fetch the web page timed out after 30 seconds."
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+  schemas:
+    GenerateWordCloudRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: The target web page URL (must be absolute HTTP or HTTPS)
+          example: "https://example.com/article"
+        width:
+          type: integer
+          minimum: 200
+          maximum: 2000
+          default: 800
+          description: Output image width in pixels
+        height:
+          type: integer
+          minimum: 200
+          maximum: 2000
+          default: 600
+          description: Output image height in pixels
+    ValidationErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: "One or more validation errors occurred."
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string

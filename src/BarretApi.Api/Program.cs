@@ -131,6 +131,12 @@ builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
 builder.Services.AddSingleton<INasaGibsClient>(sp => sp.GetRequiredService<NasaGibsClient>());
 builder.Services.AddSingleton<NasaGibsPostService>();
 
+builder.Services.AddHttpClient<AngleSharpHtmlTextExtractor>();
+builder.Services.AddSingleton<IHtmlTextExtractor>(sp =>
+	sp.GetRequiredService<AngleSharpHtmlTextExtractor>());
+builder.Services.AddSingleton<IWordCloudGenerator, SkiaWordCloudGenerator>();
+builder.Services.AddSingleton<TextAnalysisService>();
+
 var app = builder.Build();
 
 app.UseCors();

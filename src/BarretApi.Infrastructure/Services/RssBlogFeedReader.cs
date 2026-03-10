@@ -32,7 +32,8 @@ public sealed class RssBlogFeedReader(
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(feedUrl);
 
-		using var stream = await _httpClient.GetStreamAsync(feedUrl, cancellationToken);
+		var uri = new Uri(feedUrl);
+		using var stream = await _httpClient.GetStreamAsync(uri, cancellationToken);
 		return ParseFeed(stream);
 	}
 

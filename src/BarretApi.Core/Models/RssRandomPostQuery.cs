@@ -5,8 +5,8 @@ namespace BarretApi.Core.Models;
 /// </summary>
 public sealed class RssRandomPostQuery
 {
-	public required string FeedUrl { get; init; }
-	public IReadOnlyList<string> Platforms { get; init; } = [];
-	public IReadOnlyList<string> ExcludeTags { get; init; } = [];
-	public int? MaxAgeDays { get; init; }
+    public required string FeedUrl { get; init; }
+    public IReadOnlyList<string> Platforms { get; init; } = [];
+    public IReadOnlyList<string> ExcludeTags { get; init; } = [];
+    public int? MaxAgeDays { get; init; }
 }

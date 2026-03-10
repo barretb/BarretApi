@@ -32,6 +32,11 @@ public sealed class CreateSocialPostValidator : Validator<CreateSocialPostReques
                     .NotEmpty()
                     .WithMessage("Image URL is required.");
 
+                image.RuleFor(i => i.Url)
+                    .Must(BeAValidAbsoluteHttpUrl!)
+                    .When(i => !string.IsNullOrWhiteSpace(i.Url))
+                    .WithMessage("Image URL must be a valid absolute HTTP or HTTPS URL.");
+
                 image.RuleFor(i => i.AltText)
                     .NotEmpty()
                     .WithMessage("Alt text is required for every image.")
@@ -53,5 +58,11 @@ public sealed class CreateSocialPostValidator : Validator<CreateSocialPostReques
             .Must(tag => !tag.Contains(' '))
             .WithMessage("Hashtags must not contain spaces.")
             .When(x => x.Hashtags is not null && x.Hashtags.Count > 0);
+    }
+
+    private static bool BeAValidAbsoluteHttpUrl(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 }

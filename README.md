@@ -16,6 +16,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow](#get-apilinkedinauth--initiate-linkedin-oauth-flow)
   - [GET /api/linkedin/auth/callback — LinkedIn OAuth Callback](#get-apilinkedinauthcallback--linkedin-oauth-callback)
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
+  - [POST /api/word-cloud — Generate Word Cloud](#post-apiword-cloud--generate-word-cloud)
 - [Configuration](#configuration)
 - [Production Notes](#production-notes)
 
@@ -787,6 +788,100 @@ Use the `sub` value to construct your `AuthorUrn`: `urn:li:person:<sub>`.
   "error": "No LinkedIn tokens found. Visit /api/linkedin/auth first."
 }
 ```
+
+---
+
+### POST /api/word-cloud — Generate Word Cloud
+
+Generates a PNG word cloud image from the visible text content of a web page. Common English stop words are excluded and words are sized proportionally to their frequency on the page.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+| **Response Content-Type** | `image/png` |
+
+#### Request Body
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `url` | `string` | Yes | — | Absolute HTTP or HTTPS URL of the target web page. |
+| `width` | `integer` | No | `800` | Output image width in pixels (200–2000). |
+| `height` | `integer` | No | `600` | Output image height in pixels (200–2000). |
+
+#### Example — Default Dimensions
+
+```http
+POST /api/word-cloud
+```
+
+```json
+{
+  "url": "https://en.wikipedia.org/wiki/.NET"
+}
+```
+
+#### Example — Custom Dimensions
+
+```json
+{
+  "url": "https://en.wikipedia.org/wiki/.NET",
+  "width": 1200,
+  "height": 800
+}
+```
+
+#### Response — 200 OK
+
+Binary PNG image data with `Content-Type: image/png`.
+
+```bash
+curl -X POST http://localhost:5000/api/word-cloud \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -d '{"url": "https://en.wikipedia.org/wiki/.NET"}' \
+  --output word-cloud.png
+```
+
+#### Response — 400 (Validation Error)
+
+```json
+{
+  "statusCode": 400,
+  "message": "One or more validation errors occurred.",
+  "errors": {
+    "url": ["The URL must be a valid absolute HTTP or HTTPS URL."]
+  }
+}
+```
+
+#### Response — 422 (Insufficient Text)
+
+```json
+{
+  "statusCode": 422,
+  "message": "The page contains insufficient text content to generate a word cloud."
+}
+```
+
+#### Response — 502 (Fetch Failed)
+
+```json
+{
+  "statusCode": 502,
+  "message": "Failed to fetch the web page. The target URL is unreachable or returned an error."
+}
+```
+
+#### Limits
+
+| Aspect | Value |
+|---|---|
+| Fetch timeout | 30 seconds |
+| Max HTML size | 500 KB |
+| Max words in cloud | 100 |
+| Min word length | 3 characters |
+| Image size range | 200×200 to 2000×2000 px |
 
 ---
 

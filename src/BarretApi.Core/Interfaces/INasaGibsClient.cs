@@ -7,8 +7,8 @@ namespace BarretApi.Core.Interfaces;
 /// </summary>
 public interface INasaGibsClient
 {
-	/// <summary>
-	/// Fetches a snapshot image for the given request parameters.
-	/// </summary>
-	Task<GibsSnapshotEntry> GetSnapshotAsync(GibsSnapshotRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Fetches a snapshot image for the given request parameters.
+    /// </summary>
+    Task<GibsSnapshotEntry> GetSnapshotAsync(GibsSnapshotRequest request, CancellationToken cancellationToken = default);
 }
