@@ -103,7 +103,7 @@ public sealed class RssRandomPostService(
 
 		return new SocialPost
 		{
-			Text = $"{entry.Title}\n{entry.CanonicalUrl}",
+			Text = $"From the archives...\n\n{entry.Title}\n{entry.CanonicalUrl}",
 			Hashtags = hashtags,
 			ImageUrls = BuildImageUrls(entry),
 			TargetPlatforms = query.Platforms

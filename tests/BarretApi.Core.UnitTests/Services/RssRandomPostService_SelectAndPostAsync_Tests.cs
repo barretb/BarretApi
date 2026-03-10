@@ -166,7 +166,7 @@ public sealed class RssRandomPostService_SelectAndPostAsync_Tests
 		await _sut.SelectAndPostAsync(query);
 
 		await _mockClient.Received(1).PostAsync(
-			Arg.Is<string>(text => text.Contains("My Great Post") && text.Contains("https://example.com/post-1")),
+			Arg.Is<string>(text => text.Contains("From the archives...") && text.Contains("My Great Post") && text.Contains("https://example.com/post-1")),
 			Arg.Any<IReadOnlyList<UploadedImage>>(),
 			Arg.Any<CancellationToken>());
 	}
