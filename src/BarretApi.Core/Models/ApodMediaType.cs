@@ -5,13 +5,13 @@ namespace BarretApi.Core.Models;
 /// </summary>
 public enum ApodMediaType
 {
-	/// <summary>
-	/// Static image (JPEG, PNG, etc.).
-	/// </summary>
-	Image,
+    /// <summary>
+    /// Static image (JPEG, PNG, etc.).
+    /// </summary>
+    Image,
 
-	/// <summary>
-	/// Video embed (typically YouTube).
-	/// </summary>
-	Video
+    /// <summary>
+    /// Video embed (typically YouTube).
+    /// </summary>
+    Video
 }

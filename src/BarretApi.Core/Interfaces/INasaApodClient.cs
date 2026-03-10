@@ -7,5 +7,5 @@ namespace BarretApi.Core.Interfaces;
 /// </summary>
 public interface INasaApodClient
 {
-	Task<ApodEntry> GetApodAsync(DateOnly? date, CancellationToken cancellationToken = default);
+    Task<ApodEntry> GetApodAsync(DateOnly? date, CancellationToken cancellationToken = default);
 }

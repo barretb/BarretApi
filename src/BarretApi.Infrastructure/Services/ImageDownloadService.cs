@@ -35,7 +35,8 @@ public sealed class ImageDownloadService(
 
         _logger.LogInformation("Downloading image from {Url}", imageUrl);
 
-        using var response = await _httpClient.GetAsync(imageUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var uri = new Uri(imageUrl);
+        using var response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
@@ -62,7 +63,7 @@ public sealed class ImageDownloadService(
                 $"Image exceeds maximum size of {MaxImageSizeBytes} bytes (actual: {imageBytes.Length} bytes)");
         }
 
-        var fileName = ExtractFileName(imageUrl, contentType);
+        var fileName = ExtractFileName(uri, contentType);
 
         _logger.LogInformation(
             "Downloaded image: {FileName} ({ContentType}, {Size} bytes)",
@@ -79,22 +80,14 @@ public sealed class ImageDownloadService(
         };
     }
 
-    private static string ExtractFileName(string url, string contentType)
+    private static string ExtractFileName(Uri uri, string contentType)
     {
-        try
-        {
-            var uri = new Uri(url);
-            var path = uri.AbsolutePath;
-            var lastSlash = path.LastIndexOf('/');
+        var path = Uri.UnescapeDataString(uri.AbsolutePath);
+        var lastSlash = path.LastIndexOf('/');
 
-            if (lastSlash >= 0 && lastSlash < path.Length - 1)
-            {
-                return path[(lastSlash + 1)..];
-            }
-        }
-        catch
+        if (lastSlash >= 0 && lastSlash < path.Length - 1)
         {
-            // Fall through to default
+            return path[(lastSlash + 1)..];
         }
 
         var extension = contentType switch

@@ -4,6 +4,6 @@ namespace BarretApi.Core.Interfaces;
 
 public interface IBlogPromotionOrchestrator
 {
-	Task<PromotionRunSummary> RunAsync(
-		CancellationToken cancellationToken = default);
+    Task<PromotionRunSummary> RunAsync(
+        CancellationToken cancellationToken = default);
 }
