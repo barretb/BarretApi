@@ -214,7 +214,7 @@ public sealed class BlogPromotionOrchestrator(
 		=> $"{entry.Title}\n{entry.CanonicalUrl}";
 
 	private static string BuildReminderPostText(BlogPostPromotionRecord record)
-		=> $"Did you miss it earlier? {record.Title}\n{record.CanonicalUrl}";
+		=> $"In case you missed it earlier...\n\n{record.Title}\n{record.CanonicalUrl}";
 
 	private static IReadOnlyList<ImageUrl> BuildImageUrls(BlogFeedEntry entry)
 	{
