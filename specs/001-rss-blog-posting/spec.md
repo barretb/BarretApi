@@ -46,7 +46,7 @@ As a content owner, I want an optional follow-up reminder post for recently post
 
 **Acceptance Scenarios**:
 
-1. **Given** a tracked entry has an initial post and reminder posting is enabled and the configured reminder delay has elapsed, **When** the endpoint is invoked, **Then** the system posts exactly one reminder with a "Did you miss it earlier?" leader.
+1. **Given** a tracked entry has an initial post and reminder posting is enabled and the configured reminder delay has elapsed, **When** the endpoint is invoked, **Then** the system posts exactly one reminder with an "In case you missed it earlier..." leader.
 2. **Given** reminder posting is disabled, **When** the endpoint is invoked, **Then** no reminder posts are created regardless of elapsed time.
 3. **Given** a reminder was already posted for an entry, **When** the endpoint is invoked again, **Then** no additional reminder is created for that entry.
 
@@ -87,7 +87,7 @@ As a content owner, I want each endpoint run to always process new-post publishi
 - **FR-006**: System MUST support a configurable toggle to enable or disable reminder posting.
 - **FR-007**: System MUST support a configurable reminder delay in hours used when reminder posting is enabled.
 - **FR-008**: System MUST create a reminder post only for entries with a successful initial post record, no prior reminder post record, and elapsed time greater than or equal to the configured reminder delay.
-- **FR-009**: System MUST prefix reminder social post text with "Did you miss it earlier?".
+- **FR-009**: System MUST prefix reminder social post text with "In case you missed it earlier..." followed by two newline characters before the entry title.
 - **FR-010**: System MUST execute initial new-entry posting before reminder posting within the same endpoint invocation.
 - **FR-011**: System MUST prevent duplicate initial posts and duplicate reminders for the same blog entry across repeated endpoint invocations.
 - **FR-012**: System MUST return a run summary indicating counts of entries evaluated, newly posted, reminders posted, skipped, and failed posting attempts.

@@ -11,6 +11,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [POST /api/social-posts — Create Social Post (JSON)](#post-apisocial-posts--create-social-post-json)
   - [POST /api/social-posts/upload — Create Social Post (Multipart Upload)](#post-apisocial-postsupload--create-social-post-multipart-upload)
   - [POST /api/social-posts/rss-promotion — Trigger RSS Blog Promotion](#post-apisocial-postsrss-promotion--trigger-rss-blog-promotion)
+  - [POST /api/social-posts/rss-random — Post Random RSS Entry](#post-apisocial-postsrss-random--post-random-rss-entry)
   - [POST /api/social-posts/nasa-apod — Post NASA APOD to Social Platforms](#post-apisocial-postsnasa-apod--post-nasa-apod-to-social-platforms)
   - [POST /api/social-posts/satellite — Post Satellite Image](#post-apisocial-postssatellite--post-satellite-image)
   - [GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow](#get-apilinkedinauth--initiate-linkedin-oauth-flow)
@@ -293,7 +294,7 @@ Same response shape and status codes as [`POST /api/social-posts`](#post-apisoci
 
 ### POST /api/social-posts/rss-promotion — Trigger RSS Blog Promotion
 
-Reads the configured RSS feed, posts newly published entries first, then posts any eligible reminder entries. Tracks which entries have been posted using Azure Table Storage to avoid duplicates.
+Reads the configured RSS feed, posts newly published entries first, then posts any eligible reminder entries. Tracks which entries have been posted using Azure Table Storage to avoid duplicates. Initial posts contain the entry title and URL. Reminder posts are prefixed with *"In case you missed it earlier..."* followed by a blank line before the entry title and URL.
 
 | Detail | Value |
 |---|---|
@@ -376,6 +377,113 @@ No request body. The endpoint reads its RSS feed configuration from the server.
 | **400** | Invalid blog-promotion configuration. |
 | **401** | Missing or invalid `X-Api-Key`. |
 | **502** | Feed read failed or all posting attempts failed. |
+
+---
+
+### POST /api/social-posts/rss-random — Post Random RSS Entry
+
+Fetches an RSS feed, applies optional filters (tag exclusion, recency, platform targeting), randomly selects one eligible entry, and posts it to the targeted social platforms. The post text is prefixed with *"From the archives…"* and includes the entry title, URL, qualifying hashtags, and hero image if available. This endpoint is **stateless** — it does not track previously posted entries.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+
+#### Request Body
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `feedUrl` | `string` | Yes | — | Absolute URL of the RSS feed (`http` or `https`). |
+| `platforms` | `string[]` | No | All configured | Target platforms: `bluesky`, `mastodon`, `linkedin`. |
+| `excludeTags` | `string[]` | No | `[]` | Tags to exclude (case-insensitive match against entry tags). |
+| `maxAgeDays` | `int` | No | No limit | Only include entries published within this many days. Must be > 0. |
+
+#### Example — Minimal Request
+
+```bash
+curl -s -X POST https://localhost:7042/api/social-posts/rss-random \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -d '{
+    "feedUrl": "https://example.com/blog/feed.xml"
+  }'
+```
+
+#### Example — With Filters
+
+```bash
+curl -s -X POST https://localhost:7042/api/social-posts/rss-random \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -d '{
+    "feedUrl": "https://example.com/blog/feed.xml",
+    "platforms": ["bluesky", "mastodon"],
+    "excludeTags": ["personal", "draft"],
+    "maxAgeDays": 30
+  }'
+```
+
+#### Response — 200 (All Platforms Succeeded)
+
+```json
+{
+  "selectedTitle": "Building APIs with .NET Aspire",
+  "selectedUrl": "https://example.com/blog/aspire-apis",
+  "results": [
+    {
+      "platform": "bluesky",
+      "success": true,
+      "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+      "postUrl": "https://bsky.app/profile/handle.bsky.social/post/xyz789",
+      "shortenedText": "From the archives...\n\nBuilding APIs with .NET Aspire\nhttps://example.com/blog/aspire-apis #dotnet #aspire"
+    },
+    {
+      "platform": "mastodon",
+      "success": true,
+      "postId": "109876543210",
+      "postUrl": "https://mastodon.social/@you/109876543210",
+      "shortenedText": "From the archives...\n\nBuilding APIs with .NET Aspire\nhttps://example.com/blog/aspire-apis #dotnet #aspire"
+    }
+  ],
+  "postedAt": "2026-03-04T12:00:00+00:00"
+}
+```
+
+#### Response — 207 (Partial Success)
+
+```json
+{
+  "selectedTitle": "Building APIs with .NET Aspire",
+  "selectedUrl": "https://example.com/blog/aspire-apis",
+  "results": [
+    {
+      "platform": "bluesky",
+      "success": true,
+      "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+      "postUrl": "https://bsky.app/profile/handle.bsky.social/post/xyz789",
+      "shortenedText": "From the archives...\n\nBuilding APIs with .NET Aspire\nhttps://example.com/blog/aspire-apis #dotnet #aspire"
+    },
+    {
+      "platform": "mastodon",
+      "success": false,
+      "error": "Authentication failed",
+      "errorCode": "AUTH_FAILED"
+    }
+  ],
+  "postedAt": "2026-03-04T12:00:00+00:00"
+}
+```
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **200** | All targeted platforms succeeded. |
+| **207** | Partial success — at least one platform succeeded and at least one failed. |
+| **400** | Request validation failed (missing `feedUrl`, invalid URL, invalid platform, `maxAgeDays` ≤ 0). |
+| **401** | Missing or invalid `X-Api-Key`. |
+| **422** | No eligible entries remain after filtering. |
+| **502** | Feed could not be read, or all targeted platform posts failed. |
 
 ---
 
