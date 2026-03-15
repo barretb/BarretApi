@@ -1,4 +1,5 @@
 using System.ServiceModel.Syndication;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using AngleSharp;
@@ -11,12 +12,16 @@ using Microsoft.Extensions.Options;
 
 namespace BarretApi.Infrastructure.Services;
 
-public sealed class RssBlogFeedReader(
+public sealed partial class RssBlogFeedReader(
     HttpClient httpClient,
     IOptions<BlogPromotionOptions> blogPromotionOptions,
     ILogger<RssBlogFeedReader> logger) : IBlogFeedReader
 {
     private const string BarretNamespace = "https://barretblake.dev/ns/";
+    private const string MediaNamespace = "http://search.yahoo.com/mrss/";
+
+    [GeneratedRegex(@"(?<=\s|^)#(\w+)")]
+    private static partial Regex InlineHashtagPattern();
 
     private readonly HttpClient _httpClient = httpClient;
     private readonly BlogPromotionOptions _options = blogPromotionOptions.Value;
@@ -172,11 +177,9 @@ public sealed class RssBlogFeedReader(
 
     private static string? ReadMediaRssImageUrl(SyndicationItem item)
     {
-        const string mediaNamespace = "http://search.yahoo.com/mrss/";
-
         foreach (var name in new[] { "thumbnail", "content" })
         {
-            var elements = item.ElementExtensions.ReadElementExtensions<XElement>(name, mediaNamespace);
+            var elements = item.ElementExtensions.ReadElementExtensions<XElement>(name, MediaNamespace);
             var url = elements
                 .Select(e => e.Attribute("url")?.Value?.Trim())
                 .FirstOrDefault(u => IsAbsoluteHttpUrl(u));
@@ -184,6 +187,22 @@ public sealed class RssBlogFeedReader(
             if (url is not null)
             {
                 return url;
+            }
+        }
+
+        var groups = item.ElementExtensions.ReadElementExtensions<XElement>("group", MediaNamespace);
+        foreach (var group in groups)
+        {
+            foreach (var name in new[] { "thumbnail", "content" })
+            {
+                var url = group.Elements(XName.Get(name, MediaNamespace))
+                    .Select(e => e.Attribute("url")?.Value?.Trim())
+                    .FirstOrDefault(u => IsAbsoluteHttpUrl(u));
+
+                if (url is not null)
+                {
+                    return url;
+                }
             }
         }
 
@@ -215,10 +234,31 @@ public sealed class RssBlogFeedReader(
             return tags;
         }
 
-        return item.Categories
+        var categories = item.Categories
             .Select(c => c.Name?.Trim())
             .Where(name => !string.IsNullOrWhiteSpace(name))
-            .ToList()!;
+            .Select(name => name!)
+            .ToList();
+
+        if (categories.Count > 0)
+        {
+            return categories;
+        }
+
+        return ExtractInlineHashtags(ReadMediaDescription(item));
+    }
+
+    private static IReadOnlyList<string> ExtractInlineHashtags(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        return InlineHashtagPattern().Matches(text)
+            .Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static string? ReadSummary(SyndicationItem item)
@@ -232,11 +272,44 @@ public sealed class RssBlogFeedReader(
 
         if (string.IsNullOrWhiteSpace(raw))
         {
+            raw = ReadMediaDescription(item);
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
             return null;
         }
 
         var stripped = StripHtml(raw);
         return string.IsNullOrWhiteSpace(stripped) ? null : stripped;
+    }
+
+    private static string? ReadMediaDescription(SyndicationItem item)
+    {
+        var descriptions = item.ElementExtensions.ReadElementExtensions<XElement>("description", MediaNamespace);
+        var value = descriptions
+            .Select(e => e.Value?.Trim())
+            .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+        if (value is not null)
+        {
+            return value;
+        }
+
+        var groups = item.ElementExtensions.ReadElementExtensions<XElement>("group", MediaNamespace);
+        foreach (var group in groups)
+        {
+            var desc = group.Elements(XName.Get("description", MediaNamespace))
+                .Select(e => e.Value?.Trim())
+                .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+            if (desc is not null)
+            {
+                return desc;
+            }
+        }
+
+        return null;
     }
 
     private static string StripHtml(string html)
