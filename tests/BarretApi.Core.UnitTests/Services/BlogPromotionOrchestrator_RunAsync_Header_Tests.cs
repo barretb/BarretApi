@@ -9,17 +9,16 @@ using Shouldly;
 
 namespace BarretApi.Core.UnitTests.Services;
 
-public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
+public sealed class BlogPromotionOrchestrator_RunAsync_Header_Tests
 {
     private readonly IBlogFeedReader _feedReader = Substitute.For<IBlogFeedReader>();
     private readonly IBlogPostPromotionRepository _repository = Substitute.For<IBlogPostPromotionRepository>();
     private readonly ISocialPlatformClient _platformClient;
-    private readonly SocialPostService _socialPostService;
     private readonly BlogPromotionOrchestrator _sut;
 
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
 
-    public BlogPromotionOrchestrator_BuildReminderPostText_Tests()
+    public BlogPromotionOrchestrator_RunAsync_Header_Tests()
     {
         _platformClient = Substitute.For<ISocialPlatformClient>();
         _platformClient.PlatformName.Returns("testplatform");
@@ -49,7 +48,7 @@ public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
                 AllHashtags = callInfo.ArgAt<IReadOnlyList<string>>(1)
             });
 
-        _socialPostService = new SocialPostService(
+        var socialPostService = new SocialPostService(
             [_platformClient],
             textShorteningService,
             imageDownloadService,
@@ -73,71 +72,68 @@ public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
         _sut = new BlogPromotionOrchestrator(
             _feedReader,
             _repository,
-            _socialPostService,
+            socialPostService,
             options,
             Substitute.For<ILogger<BlogPromotionOrchestrator>>());
     }
 
     [Fact]
-    public async Task GeneratesCorrectReminderText_GivenEligibleRecord()
+    public async Task PrependsHeaderToInitialPostText_GivenHeaderProvided()
     {
-        var entry = CreateFeedEntry("entry-1", "My Blog Post", "https://example.com/my-post");
-        var trackedRecord = CreateReminderEligibleRecord("entry-1", "My Blog Post", "https://example.com/my-post");
+        var entry = CreateFeedEntry("entry-1", "My Post", "https://example.com/my-post");
 
         _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns([entry]);
         _repository.GetByEntryIdentityAsync("entry-1", Arg.Any<CancellationToken>())
-            .Returns(trackedRecord);
-        _repository.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([trackedRecord]);
-
-        await _sut.RunAsync();
-
-        await _platformClient.Received(1).PostAsync(
-            Arg.Is<string>(text => text == "In case you missed it earlier...\n\nMy Blog Post\nhttps://example.com/my-post"),
-            Arg.Any<IReadOnlyList<UploadedImage>>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task UsesThreeAsciiPeriods_GivenReminderPost()
-    {
-        var entry = CreateFeedEntry("entry-1", "Test Title", "https://example.com/test");
-        var trackedRecord = CreateReminderEligibleRecord("entry-1", "Test Title", "https://example.com/test");
-
-        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns([entry]);
-        _repository.GetByEntryIdentityAsync("entry-1", Arg.Any<CancellationToken>())
-            .Returns(trackedRecord);
-        _repository.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([trackedRecord]);
-
-        await _sut.RunAsync();
-
-        await _platformClient.Received(1).PostAsync(
-            Arg.Is<string>(text =>
-                text.Contains("...") &&
-                !text.Contains("\u2026")),
-            Arg.Any<IReadOnlyList<UploadedImage>>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task DoesNotAlterInitialPostText_GivenNewEntry()
-    {
-        var entry = CreateFeedEntry("new-entry", "Fresh Post", "https://example.com/fresh");
-
-        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns([entry]);
-        _repository.GetByEntryIdentityAsync("new-entry", Arg.Any<CancellationToken>())
             .Returns((BlogPostPromotionRecord?)null);
         _repository.GetAllAsync(Arg.Any<CancellationToken>())
             .Returns([]);
 
-        await _sut.RunAsync();
+        await _sut.RunAsync(header: "Check this out!");
 
         await _platformClient.Received(1).PostAsync(
-            Arg.Is<string>(text => text == "Fresh Post\nhttps://example.com/fresh"),
+            Arg.Is<string>(text => text == "Check this out!\n\nMy Post\nhttps://example.com/my-post"),
+            Arg.Any<IReadOnlyList<UploadedImage>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DoesNotPrependHeader_GivenNullHeader()
+    {
+        var entry = CreateFeedEntry("entry-1", "My Post", "https://example.com/my-post");
+
+        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns([entry]);
+        _repository.GetByEntryIdentityAsync("entry-1", Arg.Any<CancellationToken>())
+            .Returns((BlogPostPromotionRecord?)null);
+        _repository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        await _sut.RunAsync(header: null);
+
+        await _platformClient.Received(1).PostAsync(
+            Arg.Is<string>(text => text == "My Post\nhttps://example.com/my-post"),
+            Arg.Any<IReadOnlyList<UploadedImage>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrependsHeaderToReminderPostText_GivenHeaderProvided()
+    {
+        var entry = CreateFeedEntry("entry-1", "My Post", "https://example.com/my-post");
+        var trackedRecord = CreateReminderEligibleRecord("entry-1", "My Post", "https://example.com/my-post");
+
+        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns([entry]);
+        _repository.GetByEntryIdentityAsync("entry-1", Arg.Any<CancellationToken>())
+            .Returns(trackedRecord);
+        _repository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns([trackedRecord]);
+
+        await _sut.RunAsync(header: "Don't miss this!");
+
+        await _platformClient.Received(1).PostAsync(
+            Arg.Is<string>(text => text == "Don't miss this!\n\nIn case you missed it earlier...\n\nMy Post\nhttps://example.com/my-post"),
             Arg.Any<IReadOnlyList<UploadedImage>>(),
             Arg.Any<CancellationToken>());
     }

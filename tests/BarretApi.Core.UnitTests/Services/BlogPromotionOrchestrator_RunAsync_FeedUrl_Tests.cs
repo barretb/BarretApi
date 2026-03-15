@@ -9,17 +9,16 @@ using Shouldly;
 
 namespace BarretApi.Core.UnitTests.Services;
 
-public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
+public sealed class BlogPromotionOrchestrator_RunAsync_FeedUrl_Tests
 {
     private readonly IBlogFeedReader _feedReader = Substitute.For<IBlogFeedReader>();
     private readonly IBlogPostPromotionRepository _repository = Substitute.For<IBlogPostPromotionRepository>();
     private readonly ISocialPlatformClient _platformClient;
-    private readonly SocialPostService _socialPostService;
     private readonly BlogPromotionOrchestrator _sut;
 
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
 
-    public BlogPromotionOrchestrator_BuildReminderPostText_Tests()
+    public BlogPromotionOrchestrator_RunAsync_FeedUrl_Tests()
     {
         _platformClient = Substitute.For<ISocialPlatformClient>();
         _platformClient.PlatformName.Returns("testplatform");
@@ -49,7 +48,7 @@ public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
                 AllHashtags = callInfo.ArgAt<IReadOnlyList<string>>(1)
             });
 
-        _socialPostService = new SocialPostService(
+        var socialPostService = new SocialPostService(
             [_platformClient],
             textShorteningService,
             imageDownloadService,
@@ -58,9 +57,9 @@ public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
 
         var options = Options.Create(new BlogPromotionOptions
         {
-            FeedUrl = "https://example.com/feed.xml",
+            FeedUrl = "https://example.com/default-feed.xml",
             RecentDaysWindow = 7,
-            EnableReminderPosts = true,
+            EnableReminderPosts = false,
             ReminderDelayHours = 24,
             TableStorage = new BlogPromotionTableStorageOptions
             {
@@ -73,95 +72,54 @@ public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
         _sut = new BlogPromotionOrchestrator(
             _feedReader,
             _repository,
-            _socialPostService,
+            socialPostService,
             options,
             Substitute.For<ILogger<BlogPromotionOrchestrator>>());
     }
 
     [Fact]
-    public async Task GeneratesCorrectReminderText_GivenEligibleRecord()
+    public async Task UsesConfigFeedUrl_GivenNullFeedUrl()
     {
-        var entry = CreateFeedEntry("entry-1", "My Blog Post", "https://example.com/my-post");
-        var trackedRecord = CreateReminderEligibleRecord("entry-1", "My Blog Post", "https://example.com/my-post");
-
         _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns([entry]);
-        _repository.GetByEntryIdentityAsync("entry-1", Arg.Any<CancellationToken>())
-            .Returns(trackedRecord);
-        _repository.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([trackedRecord]);
-
-        await _sut.RunAsync();
-
-        await _platformClient.Received(1).PostAsync(
-            Arg.Is<string>(text => text == "In case you missed it earlier...\n\nMy Blog Post\nhttps://example.com/my-post"),
-            Arg.Any<IReadOnlyList<UploadedImage>>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task UsesThreeAsciiPeriods_GivenReminderPost()
-    {
-        var entry = CreateFeedEntry("entry-1", "Test Title", "https://example.com/test");
-        var trackedRecord = CreateReminderEligibleRecord("entry-1", "Test Title", "https://example.com/test");
-
-        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns([entry]);
-        _repository.GetByEntryIdentityAsync("entry-1", Arg.Any<CancellationToken>())
-            .Returns(trackedRecord);
-        _repository.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([trackedRecord]);
-
-        await _sut.RunAsync();
-
-        await _platformClient.Received(1).PostAsync(
-            Arg.Is<string>(text =>
-                text.Contains("...") &&
-                !text.Contains("\u2026")),
-            Arg.Any<IReadOnlyList<UploadedImage>>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task DoesNotAlterInitialPostText_GivenNewEntry()
-    {
-        var entry = CreateFeedEntry("new-entry", "Fresh Post", "https://example.com/fresh");
-
-        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns([entry]);
-        _repository.GetByEntryIdentityAsync("new-entry", Arg.Any<CancellationToken>())
-            .Returns((BlogPostPromotionRecord?)null);
+            .Returns([]);
         _repository.GetAllAsync(Arg.Any<CancellationToken>())
             .Returns([]);
 
-        await _sut.RunAsync();
+        await _sut.RunAsync(feedUrl: null);
 
-        await _platformClient.Received(1).PostAsync(
-            Arg.Is<string>(text => text == "Fresh Post\nhttps://example.com/fresh"),
-            Arg.Any<IReadOnlyList<UploadedImage>>(),
+        await _feedReader.Received(1).ReadEntriesAsync(
+            "https://example.com/default-feed.xml",
             Arg.Any<CancellationToken>());
     }
 
-    private static BlogFeedEntry CreateFeedEntry(string identity, string title, string url) =>
-        new()
-        {
-            EntryIdentity = identity,
-            CanonicalUrl = url,
-            Title = title,
-            PublishedAtUtc = Now.AddDays(-1),
-            Tags = ["dotnet"]
-        };
+    [Fact]
+    public async Task UsesConfigFeedUrl_GivenEmptyFeedUrl()
+    {
+        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        _repository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns([]);
 
-    private static BlogPostPromotionRecord CreateReminderEligibleRecord(string identity, string title, string url) =>
-        new()
-        {
-            EntryIdentity = identity,
-            CanonicalUrl = url,
-            Title = title,
-            PublishedAtUtc = Now.AddDays(-3),
-            InitialPostStatus = PostAttemptStatus.Succeeded,
-            InitialPostSucceededAtUtc = Now.AddDays(-2),
-            ReminderPostStatus = PostAttemptStatus.NotAttempted,
-            LastProcessedAtUtc = Now.AddDays(-2)
-        };
+        await _sut.RunAsync(feedUrl: "");
+
+        await _feedReader.Received(1).ReadEntriesAsync(
+            "https://example.com/default-feed.xml",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UsesProvidedFeedUrl_GivenCustomFeedUrl()
+    {
+        var customUrl = "https://other.example.com/rss.xml";
+        _feedReader.ReadEntriesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        _repository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        await _sut.RunAsync(feedUrl: customUrl);
+
+        await _feedReader.Received(1).ReadEntriesAsync(
+            customUrl,
+            Arg.Any<CancellationToken>());
+    }
 }

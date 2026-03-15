@@ -112,9 +112,9 @@ builder.Services.AddSingleton<RssRandomPostService>();
 builder.Services.Configure<NasaApodOptions>(builder.Configuration.GetSection(NasaApodOptions.SectionName));
 builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
 {
-	var nasaOptions = builder.Configuration.GetSection(NasaApodOptions.SectionName);
-	client.BaseAddress = new Uri(nasaOptions["BaseUrl"] ?? "https://api.nasa.gov");
-	client.Timeout = TimeSpan.FromSeconds(15);
+    var nasaOptions = builder.Configuration.GetSection(NasaApodOptions.SectionName);
+    client.BaseAddress = new Uri(nasaOptions["BaseUrl"] ?? "https://api.nasa.gov");
+    client.Timeout = TimeSpan.FromSeconds(15);
 });
 builder.Services.AddSingleton<INasaApodClient>(sp => sp.GetRequiredService<NasaApodClient>());
 builder.Services.AddSingleton<IImageResizer, SkiaImageResizer>();
@@ -123,17 +123,17 @@ builder.Services.AddSingleton<NasaApodPostService>();
 builder.Services.Configure<NasaGibsOptions>(builder.Configuration.GetSection(NasaGibsOptions.SectionName));
 builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
 {
-	var gibsOptions = builder.Configuration.GetSection(NasaGibsOptions.SectionName);
-	client.BaseAddress = new Uri(
-		gibsOptions["BaseUrl"] ?? "https://wvs.earthdata.nasa.gov");
-	client.Timeout = TimeSpan.FromSeconds(30);
+    var gibsOptions = builder.Configuration.GetSection(NasaGibsOptions.SectionName);
+    client.BaseAddress = new Uri(
+        gibsOptions["BaseUrl"] ?? "https://wvs.earthdata.nasa.gov");
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddSingleton<INasaGibsClient>(sp => sp.GetRequiredService<NasaGibsClient>());
 builder.Services.AddSingleton<NasaGibsPostService>();
 
 builder.Services.AddHttpClient<AngleSharpHtmlTextExtractor>();
 builder.Services.AddSingleton<IHtmlTextExtractor>(sp =>
-	sp.GetRequiredService<AngleSharpHtmlTextExtractor>());
+    sp.GetRequiredService<AngleSharpHtmlTextExtractor>());
 builder.Services.AddSingleton<IWordCloudGenerator, SkiaWordCloudGenerator>();
 builder.Services.AddSingleton<TextAnalysisService>();
 

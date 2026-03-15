@@ -6,129 +6,129 @@ using Microsoft.Extensions.Logging;
 namespace BarretApi.Api.Features.SocialPost;
 
 public sealed class TriggerRssPromotionEndpoint(
-	IBlogPromotionOrchestrator blogPromotionOrchestrator,
-	ILogger<TriggerRssPromotionEndpoint> logger)
-	: EndpointWithoutRequest<TriggerRssPromotionResponse>
+    IBlogPromotionOrchestrator blogPromotionOrchestrator,
+    ILogger<TriggerRssPromotionEndpoint> logger)
+    : Endpoint<TriggerRssPromotionRequest, TriggerRssPromotionResponse>
 {
-	private readonly IBlogPromotionOrchestrator _blogPromotionOrchestrator = blogPromotionOrchestrator;
-	private readonly ILogger<TriggerRssPromotionEndpoint> _logger = logger;
+    private readonly IBlogPromotionOrchestrator _blogPromotionOrchestrator = blogPromotionOrchestrator;
+    private readonly ILogger<TriggerRssPromotionEndpoint> _logger = logger;
 
-	public override void Configure()
-	{
-		Post("/api/social-posts/rss-promotion");
+    public override void Configure()
+    {
+        Post("/api/social-posts/rss-promotion");
 
-		Summary(s =>
-		{
-			s.Summary = "Trigger RSS blog promotion";
-			s.Description = "Checks RSS feed, posts new blog entries first, then eligible reminder posts.";
-			s.Responses[200] = "Promotion run completed. Includes counts and failure details.";
-			s.Responses[400] = "Invalid blog-promotion configuration.";
-			s.Responses[401] = "Missing or invalid X-Api-Key.";
-			s.Responses[502] = "Feed read failed or all posting attempts failed.";
-		});
-	}
+        Summary(s =>
+        {
+            s.Summary = "Trigger RSS blog promotion";
+            s.Description = "Checks RSS feed, posts new blog entries first, then eligible reminder posts.";
+            s.Responses[200] = "Promotion run completed. Includes counts and failure details.";
+            s.Responses[400] = "Invalid blog-promotion configuration.";
+            s.Responses[401] = "Missing or invalid X-Api-Key.";
+            s.Responses[502] = "Feed read failed or all posting attempts failed.";
+        });
+    }
 
-	public override async Task HandleAsync(CancellationToken ct)
-	{
-		try
-		{
-			var summary = await _blogPromotionOrchestrator.RunAsync(ct);
-			var response = MapToResponse(summary);
-			var statusCode = DetermineStatusCode(summary);
+    public override async Task HandleAsync(TriggerRssPromotionRequest req, CancellationToken ct)
+    {
+        try
+        {
+            var summary = await _blogPromotionOrchestrator.RunAsync(req.FeedUrl, req.Header, req.RecentDaysWindow, ct);
+            var response = MapToResponse(summary);
+            var statusCode = DetermineStatusCode(summary);
 
-			await Send.ResponseAsync(response, statusCode, ct);
-		}
-		catch (InvalidOperationException ex)
-		{
-			_logger.LogWarning(ex, "Invalid RSS promotion configuration");
-			AddError(ex.Message);
-			await Send.ErrorsAsync(cancellation: ct);
-		}
-		catch (Exception ex)
-		{
-			_logger.LogError(ex, "Unhandled RSS promotion failure");
+            await Send.ResponseAsync(response, statusCode, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid RSS promotion configuration");
+            AddError(ex.Message);
+            await Send.ErrorsAsync(cancellation: ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled RSS promotion failure");
 
-			var now = DateTimeOffset.UtcNow;
-			var response = new TriggerRssPromotionResponse
-			{
-				RunId = "failed-" + Guid.NewGuid().ToString("N")[..8],
-				StartedAtUtc = now,
-				CompletedAtUtc = now,
-				EntriesEvaluated = 0,
-				NewPostsAttempted = 0,
-				NewPostsSucceeded = 0,
-				ReminderPostsAttempted = 0,
-				ReminderPostsSucceeded = 0,
-				EntriesSkippedAlreadyPosted = 0,
-				EntriesSkippedOutsideWindow = 0,
-				EntriesSkippedNoTags = 0,
-				Failures =
-				[
-					new TriggerRssPromotionFailure
-					{
-						EntryIdentity = "rss-feed",
-						CanonicalUrl = string.Empty,
-						Phase = PromotionPhase.Initial.ToString(),
-						Platform = "rss-promotion",
-						ErrorCode = "UNHANDLED_EXCEPTION",
-						ErrorMessage = ex.Message
-					}
-				],
-				LastTwoBlogPosts = []
-			};
+            var now = DateTimeOffset.UtcNow;
+            var response = new TriggerRssPromotionResponse
+            {
+                RunId = "failed-" + Guid.NewGuid().ToString("N")[..8],
+                StartedAtUtc = now,
+                CompletedAtUtc = now,
+                EntriesEvaluated = 0,
+                NewPostsAttempted = 0,
+                NewPostsSucceeded = 0,
+                ReminderPostsAttempted = 0,
+                ReminderPostsSucceeded = 0,
+                EntriesSkippedAlreadyPosted = 0,
+                EntriesSkippedOutsideWindow = 0,
+                EntriesSkippedNoTags = 0,
+                Failures =
+                [
+                    new TriggerRssPromotionFailure
+                    {
+                        EntryIdentity = "rss-feed",
+                        CanonicalUrl = string.Empty,
+                        Phase = PromotionPhase.Initial.ToString(),
+                        Platform = "rss-promotion",
+                        ErrorCode = "UNHANDLED_EXCEPTION",
+                        ErrorMessage = ex.Message
+                    }
+                ],
+                LastTwoBlogPosts = []
+            };
 
-			await Send.ResponseAsync(response, 502, ct);
-		}
-	}
+            await Send.ResponseAsync(response, 502, ct);
+        }
+    }
 
-	private static TriggerRssPromotionResponse MapToResponse(PromotionRunSummary summary)
-	{
-		return new TriggerRssPromotionResponse
-		{
-			RunId = summary.RunId,
-			StartedAtUtc = summary.StartedAtUtc,
-			CompletedAtUtc = summary.CompletedAtUtc,
-			EntriesEvaluated = summary.EntriesEvaluated,
-			NewPostsAttempted = summary.NewPostsAttempted,
-			NewPostsSucceeded = summary.NewPostsSucceeded,
-			ReminderPostsAttempted = summary.ReminderPostsAttempted,
-			ReminderPostsSucceeded = summary.ReminderPostsSucceeded,
-			EntriesSkippedAlreadyPosted = summary.EntriesSkippedAlreadyPosted,
-			EntriesSkippedOutsideWindow = summary.EntriesSkippedOutsideWindow,
-			EntriesSkippedNoTags = summary.EntriesSkippedNoTags,
-			LastTwoBlogPosts = summary.LastTwoBlogPosts.Select(p => new TriggerRssPromotionBlogPost
-			{
-				EntryIdentity = p.EntryIdentity,
-				CanonicalUrl = p.CanonicalUrl,
-				Title = p.Title,
-				PublishedAtUtc = p.PublishedAtUtc
-			}).ToList(),
-			Failures = summary.Failures.Select(f => new TriggerRssPromotionFailure
-			{
-				EntryIdentity = f.EntryIdentity,
-				CanonicalUrl = f.CanonicalUrl,
-				Phase = f.Phase.ToString(),
-				Platform = f.Platform,
-				ErrorCode = f.ErrorCode,
-				ErrorMessage = f.ErrorMessage
-			}).ToList()
-		};
-	}
+    private static TriggerRssPromotionResponse MapToResponse(PromotionRunSummary summary)
+    {
+        return new TriggerRssPromotionResponse
+        {
+            RunId = summary.RunId,
+            StartedAtUtc = summary.StartedAtUtc,
+            CompletedAtUtc = summary.CompletedAtUtc,
+            EntriesEvaluated = summary.EntriesEvaluated,
+            NewPostsAttempted = summary.NewPostsAttempted,
+            NewPostsSucceeded = summary.NewPostsSucceeded,
+            ReminderPostsAttempted = summary.ReminderPostsAttempted,
+            ReminderPostsSucceeded = summary.ReminderPostsSucceeded,
+            EntriesSkippedAlreadyPosted = summary.EntriesSkippedAlreadyPosted,
+            EntriesSkippedOutsideWindow = summary.EntriesSkippedOutsideWindow,
+            EntriesSkippedNoTags = summary.EntriesSkippedNoTags,
+            LastTwoBlogPosts = summary.LastTwoBlogPosts.Select(p => new TriggerRssPromotionBlogPost
+            {
+                EntryIdentity = p.EntryIdentity,
+                CanonicalUrl = p.CanonicalUrl,
+                Title = p.Title,
+                PublishedAtUtc = p.PublishedAtUtc
+            }).ToList(),
+            Failures = summary.Failures.Select(f => new TriggerRssPromotionFailure
+            {
+                EntryIdentity = f.EntryIdentity,
+                CanonicalUrl = f.CanonicalUrl,
+                Phase = f.Phase.ToString(),
+                Platform = f.Platform,
+                ErrorCode = f.ErrorCode,
+                ErrorMessage = f.ErrorMessage
+            }).ToList()
+        };
+    }
 
-	private static int DetermineStatusCode(PromotionRunSummary summary)
-	{
-		if (summary.Failures.Any(f => f.ErrorCode == "RSS_FEED_READ_FAILED"))
-		{
-			return 502;
-		}
+    private static int DetermineStatusCode(PromotionRunSummary summary)
+    {
+        if (summary.Failures.Any(f => f.ErrorCode == "RSS_FEED_READ_FAILED"))
+        {
+            return 502;
+        }
 
-		var attempted = summary.NewPostsAttempted + summary.ReminderPostsAttempted;
-		var succeeded = summary.NewPostsSucceeded + summary.ReminderPostsSucceeded;
-		if (attempted > 0 && succeeded == 0)
-		{
-			return 502;
-		}
+        var attempted = summary.NewPostsAttempted + summary.ReminderPostsAttempted;
+        var succeeded = summary.NewPostsSucceeded + summary.ReminderPostsSucceeded;
+        if (attempted > 0 && succeeded == 0)
+        {
+            return 502;
+        }
 
-		return 200;
-	}
+        return 200;
+    }
 }
