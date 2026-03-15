@@ -111,7 +111,63 @@ public sealed class RssBlogFeedReader(
             return enclosureImage;
         }
 
-        return ReadMediaRssImageUrl(item);
+        var mediaRssImage = ReadMediaRssImageUrl(item);
+        if (mediaRssImage is not null)
+        {
+            return mediaRssImage;
+        }
+
+        var itemImageUrl = ReadItemImageUrl(item);
+        if (itemImageUrl is not null)
+        {
+            return itemImageUrl;
+        }
+
+        return ReadContentImageUrl(item);
+    }
+
+    private static string? ReadItemImageUrl(SyndicationItem item)
+    {
+        var imageElements = item.ElementExtensions
+            .Where(ext => string.Equals(ext.OuterName, "image", StringComparison.OrdinalIgnoreCase));
+
+        foreach (var ext in imageElements)
+        {
+            var element = ext.GetObject<XElement>();
+            var url = element.Attribute("url")?.Value?.Trim();
+
+            if (IsAbsoluteHttpUrl(url))
+            {
+                return url;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ReadContentImageUrl(SyndicationItem item)
+    {
+        var raw = item.Summary?.Text;
+
+        if (string.IsNullOrWhiteSpace(raw) && item.Content is TextSyndicationContent textContent)
+        {
+            raw = textContent.Text;
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var context = BrowsingContext.New(Configuration.Default);
+        var parser = context.GetService<IHtmlParser>()!;
+        using var document = parser.ParseDocument(raw);
+
+        var imgSrc = document.QuerySelector("img[src]")
+            ?.GetAttribute("src")
+            ?.Trim();
+
+        return IsAbsoluteHttpUrl(imgSrc) ? imgSrc : null;
     }
 
     private static string? ReadMediaRssImageUrl(SyndicationItem item)

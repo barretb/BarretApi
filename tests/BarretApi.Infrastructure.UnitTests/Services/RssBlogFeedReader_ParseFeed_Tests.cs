@@ -222,6 +222,99 @@ public sealed class RssBlogFeedReader_ParseFeed_Tests
 
     #endregion
 
+    #region Hero image from item-level <image> element
+
+    [Fact]
+    public async Task ParsesFeed_ExtractsHeroImageFromItemImageElement_GivenImageUrlAttribute()
+    {
+        var feed = BuildRssFeedWithItemImage("https://example.com/item-image.webp", "image/jpeg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBe("https://example.com/item-image.webp");
+    }
+
+    [Fact]
+    public async Task ParsesFeed_PrefersEnclosureOverItemImage_GivenBoth()
+    {
+        var feed = BuildRssFeedWithEnclosureAndItemImage(
+            "https://example.com/enclosure.jpg", "image/jpeg",
+            "https://example.com/item-image.webp", "image/webp");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBe("https://example.com/enclosure.jpg");
+    }
+
+    #endregion
+
+    #region Hero image from HTML content
+
+    [Fact]
+    public async Task ParsesFeed_ExtractsHeroImageFromHtmlSummary_GivenImgTag()
+    {
+        var html = "<p>Check out this post</p><img src=\"https://example.com/content-image.jpg\" alt=\"hero\"><p>More text</p>";
+        var feed = BuildRssFeed(description: html);
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBe("https://example.com/content-image.jpg");
+    }
+
+    [Fact]
+    public async Task ParsesFeed_ReturnsNullHeroImage_GivenNoImageInHtmlSummary()
+    {
+        var html = "<p>Just text, no images here</p>";
+        var feed = BuildRssFeed(description: html);
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ParsesFeed_IgnoresRelativeImageUrls_GivenRelativeSrcInHtml()
+    {
+        var html = "<p>Post</p><img src=\"/images/local.jpg\">";
+        var feed = BuildRssFeed(description: html);
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ParsesFeed_PrefersEnclosureOverHtmlImage_GivenBoth()
+    {
+        var html = "<p>Post</p><img src=\"https://example.com/content-image.jpg\">";
+        var feed = BuildRssFeedWithEnclosureAndHtmlSummary(
+            "https://example.com/enclosure.jpg", "image/jpeg", html);
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBe("https://example.com/enclosure.jpg");
+    }
+
+    [Fact]
+    public async Task ParsesFeed_ExtractsHeroImageFromAtomContent_GivenNoSummaryImage()
+    {
+        var html = "<p>Content</p><img src=\"https://example.com/atom-image.jpg\">";
+        var feed = BuildAtomFeed(summaryText: null, contentText: html);
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBe("https://example.com/atom-image.jpg");
+    }
+
+    #endregion
+
     #region T016: Category-to-tag fallback
 
     [Fact]
@@ -429,6 +522,62 @@ public sealed class RssBlogFeedReader_ParseFeed_Tests
         standardItem.Links.Add(new SyndicationLink(new Uri("https://example.com/enclosure.jpg"), "enclosure", "Image", "image/jpeg", 0));
 
         return new SyndicationFeed([customItem, standardItem]);
+    }
+
+    private static SyndicationFeed BuildRssFeedWithEnclosureAndHtmlSummary(
+        string enclosureUrl, string mediaType, string htmlSummary)
+    {
+        var item = new SyndicationItem
+        {
+            Id = "enclosure-html-entry-1",
+            Title = new TextSyndicationContent("Enclosure + HTML Test Entry"),
+            PublishDate = DateTimeOffset.UtcNow.AddDays(-1),
+            Summary = new TextSyndicationContent(htmlSummary)
+        };
+        item.Links.Add(new SyndicationLink(new Uri("https://example.com/post-1")));
+        item.Links.Add(new SyndicationLink(new Uri(enclosureUrl), "enclosure", "Enclosure", mediaType, 0));
+
+        return new SyndicationFeed([item]);
+    }
+
+    private static SyndicationFeed BuildRssFeedWithItemImage(string imageUrl, string imageType)
+    {
+        var item = new SyndicationItem
+        {
+            Id = "item-image-entry-1",
+            Title = new TextSyndicationContent("Item Image Test Entry"),
+            PublishDate = DateTimeOffset.UtcNow.AddDays(-1),
+            Summary = new TextSyndicationContent("A post with an item image")
+        };
+        item.Links.Add(new SyndicationLink(new Uri("https://example.com/post-1")));
+
+        var imageElement = new XElement("image",
+            new XAttribute("url", imageUrl),
+            new XAttribute("type", imageType));
+        item.ElementExtensions.Add(imageElement);
+
+        return new SyndicationFeed([item]);
+    }
+
+    private static SyndicationFeed BuildRssFeedWithEnclosureAndItemImage(
+        string enclosureUrl, string enclosureType,
+        string imageUrl, string imageType)
+    {
+        var item = new SyndicationItem
+        {
+            Id = "enclosure-itemimage-entry-1",
+            Title = new TextSyndicationContent("Enclosure + Item Image Test Entry"),
+            PublishDate = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+        item.Links.Add(new SyndicationLink(new Uri("https://example.com/post-1")));
+        item.Links.Add(new SyndicationLink(new Uri(enclosureUrl), "enclosure", "Enclosure", enclosureType, 0));
+
+        var imageElement = new XElement("image",
+            new XAttribute("url", imageUrl),
+            new XAttribute("type", imageType));
+        item.ElementExtensions.Add(imageElement);
+
+        return new SyndicationFeed([item]);
     }
 
     private static byte[] SerializeFeed(SyndicationFeed feed)
