@@ -10,8 +10,18 @@ namespace BarretApi.Core.Services;
 /// </summary>
 public sealed partial class HashtagService : IHashtagService
 {
+    private static readonly Dictionary<string, string> SpecialMappings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["C#"] = "csharp",
+        [".NET"] = "dotnet",
+        ["F#"] = "fsharp",
+    };
+
     [GeneratedRegex(@"(?<=\s|^)#(\w+)", RegexOptions.Compiled)]
     private static partial Regex HashtagPattern();
+
+    [GeneratedRegex(@"[^\w]")]
+    private static partial Regex NonWordCharacterPattern();
 
     public HashtagProcessingResult ProcessHashtags(string text, IReadOnlyList<string> separateHashtags)
     {
@@ -104,6 +114,13 @@ public sealed partial class HashtagService : IHashtagService
 
     private static string NormalizeTag(string tag)
     {
-        return tag.TrimStart('#');
+        var trimmed = tag.TrimStart('#');
+
+        if (SpecialMappings.TryGetValue(trimmed, out var mapped))
+        {
+            return mapped;
+        }
+
+        return NonWordCharacterPattern().Replace(trimmed, "");
     }
 }
