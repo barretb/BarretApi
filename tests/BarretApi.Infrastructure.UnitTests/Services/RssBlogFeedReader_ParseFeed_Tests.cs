@@ -341,6 +341,116 @@ public sealed class RssBlogFeedReader_ParseFeed_Tests
 
     #endregion
 
+    #region YouTube / media:group support
+
+    [Fact]
+    public async Task ParsesFeed_ExtractsImageFromMediaGroup_GivenThumbnailInsideGroup()
+    {
+        var feed = BuildYouTubeFeed(
+            description: "A video about coding",
+            thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBe("https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+    }
+
+    [Fact]
+    public async Task ParsesFeed_ExtractsSummaryFromMediaDescription_GivenNoSummaryOrContent()
+    {
+        var feed = BuildYouTubeFeed(
+            description: "This is a great video about .NET Aspire #aspire #dotnet",
+            thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].Summary.ShouldBe("This is a great video about .NET Aspire #aspire #dotnet");
+    }
+
+    [Fact]
+    public async Task ParsesFeed_PrefersSummaryOverMediaDescription_GivenBoth()
+    {
+        var feed = BuildYouTubeFeedWithSummary(
+            summary: "Short summary text",
+            mediaDescription: "Full media description #tag1 #tag2",
+            thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].Summary.ShouldBe("Short summary text");
+    }
+
+    [Fact]
+    public async Task ParsesFeed_ExtractsInlineHashtagsFromMediaDescription_GivenNoCategoriesOrCustomTags()
+    {
+        var feed = BuildYouTubeFeed(
+            description: "A video about power automate connectors #powerautomate #flow #flowfam",
+            thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].Tags.ShouldBe(new[] { "powerautomate", "flow", "flowfam" });
+    }
+
+    [Fact]
+    public async Task ParsesFeed_PrefersCategoriesOverInlineHashtags_GivenBoth()
+    {
+        var feed = BuildYouTubeFeedWithCategories(
+            description: "A video #inlinetag",
+            thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+            categories: ["category1", "category2"]);
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].Tags.ShouldBe(new[] { "category1", "category2" });
+    }
+
+    [Fact]
+    public async Task ParsesFeed_ReturnsEmptyTags_GivenMediaDescriptionWithNoHashtags()
+    {
+        var feed = BuildYouTubeFeed(
+            description: "A video with no hashtags in the description",
+            thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].Tags.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ParsesFeed_DeduplicatesInlineHashtags_GivenDuplicatesInDescription()
+    {
+        var feed = BuildYouTubeFeed(
+            description: "Check out #dotnet and more #dotnet content #aspire",
+            thumbnailUrl: "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].Tags.ShouldBe(new[] { "dotnet", "aspire" });
+    }
+
+    [Fact]
+    public async Task ParsesFeed_PrefersDirectMediaThumbnailOverGrouped_GivenBoth()
+    {
+        var feed = BuildFeedWithDirectAndGroupedMediaThumbnail(
+            directUrl: "https://example.com/direct-thumb.jpg",
+            groupedUrl: "https://example.com/grouped-thumb.jpg");
+        SetFeed(feed);
+
+        var entries = await _sut.ReadEntriesAsync("https://example.com/feed.xml");
+
+        entries[0].HeroImageUrl.ShouldBe("https://example.com/direct-thumb.jpg");
+    }
+
+    #endregion
+
     #region Feed builders
 
     private SyndicationFeed? _currentFeed;
@@ -576,6 +686,105 @@ public sealed class RssBlogFeedReader_ParseFeed_Tests
             new XAttribute("url", imageUrl),
             new XAttribute("type", imageType));
         item.ElementExtensions.Add(imageElement);
+
+        return new SyndicationFeed([item]);
+    }
+
+    private static SyndicationFeed BuildYouTubeFeed(string description, string thumbnailUrl)
+    {
+        const string mediaNamespace = "http://search.yahoo.com/mrss/";
+
+        var item = new SyndicationItem
+        {
+            Id = "yt:video:abc123",
+            Title = new TextSyndicationContent("YouTube Video Entry"),
+            PublishDate = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+        item.Links.Add(new SyndicationLink(new Uri("https://www.youtube.com/watch?v=abc123")));
+
+        var mediaGroup = new XElement(XName.Get("group", mediaNamespace),
+            new XElement(XName.Get("title", mediaNamespace), "YouTube Video Entry"),
+            new XElement(XName.Get("description", mediaNamespace), description),
+            new XElement(XName.Get("thumbnail", mediaNamespace),
+                new XAttribute("url", thumbnailUrl),
+                new XAttribute("width", "480"),
+                new XAttribute("height", "360")));
+        item.ElementExtensions.Add(mediaGroup);
+
+        return new SyndicationFeed([item]);
+    }
+
+    private static SyndicationFeed BuildYouTubeFeedWithSummary(
+        string summary, string mediaDescription, string thumbnailUrl)
+    {
+        const string mediaNamespace = "http://search.yahoo.com/mrss/";
+
+        var item = new SyndicationItem
+        {
+            Id = "yt:video:def456",
+            Title = new TextSyndicationContent("YouTube Video With Summary"),
+            PublishDate = DateTimeOffset.UtcNow.AddDays(-1),
+            Summary = new TextSyndicationContent(summary)
+        };
+        item.Links.Add(new SyndicationLink(new Uri("https://www.youtube.com/watch?v=def456")));
+
+        var mediaGroup = new XElement(XName.Get("group", mediaNamespace),
+            new XElement(XName.Get("description", mediaNamespace), mediaDescription),
+            new XElement(XName.Get("thumbnail", mediaNamespace),
+                new XAttribute("url", thumbnailUrl)));
+        item.ElementExtensions.Add(mediaGroup);
+
+        return new SyndicationFeed([item]);
+    }
+
+    private static SyndicationFeed BuildYouTubeFeedWithCategories(
+        string description, string thumbnailUrl, string[] categories)
+    {
+        const string mediaNamespace = "http://search.yahoo.com/mrss/";
+
+        var item = new SyndicationItem
+        {
+            Id = "yt:video:ghi789",
+            Title = new TextSyndicationContent("YouTube Video With Categories"),
+            PublishDate = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+        item.Links.Add(new SyndicationLink(new Uri("https://www.youtube.com/watch?v=ghi789")));
+
+        var mediaGroup = new XElement(XName.Get("group", mediaNamespace),
+            new XElement(XName.Get("description", mediaNamespace), description),
+            new XElement(XName.Get("thumbnail", mediaNamespace),
+                new XAttribute("url", thumbnailUrl)));
+        item.ElementExtensions.Add(mediaGroup);
+
+        foreach (var cat in categories)
+        {
+            item.Categories.Add(new SyndicationCategory(cat));
+        }
+
+        return new SyndicationFeed([item]);
+    }
+
+    private static SyndicationFeed BuildFeedWithDirectAndGroupedMediaThumbnail(
+        string directUrl, string groupedUrl)
+    {
+        const string mediaNamespace = "http://search.yahoo.com/mrss/";
+
+        var item = new SyndicationItem
+        {
+            Id = "media-both-entry-1",
+            Title = new TextSyndicationContent("Direct + Grouped Media Entry"),
+            PublishDate = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+        item.Links.Add(new SyndicationLink(new Uri("https://example.com/post-1")));
+
+        var directThumbnail = new XElement(XName.Get("thumbnail", mediaNamespace),
+            new XAttribute("url", directUrl));
+        item.ElementExtensions.Add(directThumbnail);
+
+        var mediaGroup = new XElement(XName.Get("group", mediaNamespace),
+            new XElement(XName.Get("thumbnail", mediaNamespace),
+                new XAttribute("url", groupedUrl)));
+        item.ElementExtensions.Add(mediaGroup);
 
         return new SyndicationFeed([item]);
     }
