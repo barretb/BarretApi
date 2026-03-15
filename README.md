@@ -296,18 +296,41 @@ Same response shape and status codes as [`POST /api/social-posts`](#post-apisoci
 
 Reads the configured RSS feed, posts newly published entries first, then posts any eligible reminder entries. Tracks which entries have been posted using Azure Table Storage to avoid duplicates. Initial posts contain the entry title and URL. Reminder posts are prefixed with *"In case you missed it earlier..."* followed by a blank line before the entry title and URL.
 
+Supports both **standard Atom 2.0 / RSS 2.0 feeds** and the **custom blog feed format**. All entries are eligible regardless of whether they have tags — the same standard feed fallbacks described in the [rss-random endpoint](#post-apisocial-postsrss-random--post-random-rss-entry) apply here (summary, hero image, and tag extraction from standard feed elements).
+
 | Detail | Value |
 |---|---|
 | **Auth** | `X-Api-Key` header |
-| **Content-Type** | None (no request body) |
+| **Content-Type** | `application/json` (optional — body may be omitted or empty) |
 
-#### Example
+#### Request Body
+
+All fields are optional. When the body is omitted entirely, the endpoint uses the configured defaults.
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `feedUrl` | `string` | No | Server config | URL of the RSS/Atom feed to read. Must be an absolute `http` or `https` URL. Falls back to the configured default when omitted or empty. |
+| `header` | `string` | No | _(none)_ | Text prepended to every post (initial and reminder). Separated from the post body by a blank line. |
+| `recentDaysWindow` | `int` | No | Server config | Number of days back to look for posts to promote. Must be greater than 0 when provided. Overrides the configured `RecentDaysWindow`. |
+
+#### Example — Default Feed (No Body)
 
 ```http
 POST /api/social-posts/rss-promotion
 ```
 
-No request body. The endpoint reads its RSS feed configuration from the server.
+#### Example — Custom Feed URL with Header
+
+```http
+POST /api/social-posts/rss-promotion
+Content-Type: application/json
+
+{
+  "feedUrl": "https://example.com/custom-feed.xml",
+  "header": "Check out this blog post!",
+  "recentDaysWindow": 14
+}
+```
 
 #### Response — 200 OK
 
@@ -384,6 +407,12 @@ No request body. The endpoint reads its RSS feed configuration from the server.
 
 Fetches an RSS feed, applies optional filters (tag exclusion, recency, platform targeting), randomly selects one eligible entry, and posts it to the targeted social platforms. The post text is prefixed with *"From the archives…"* and includes the entry title, URL, qualifying hashtags, and hero image if available. This endpoint is **stateless** — it does not track previously posted entries.
 
+Supports both **standard Atom 2.0 / RSS 2.0 feeds** and the **custom blog feed format** with `https://barretblake.dev/ns/` namespace extensions. When custom extensions are absent, the endpoint falls back to standard feed elements:
+
+- **Summary**: Prefers `<summary>`, falls back to Atom `<content>`. HTML is stripped to plain text automatically.
+- **Hero image**: Prefers custom `<hero>` extension, falls back to enclosure links with `image/*` media type, then Media RSS `<media:thumbnail>` / `<media:content>`.
+- **Tags**: Prefers custom `<tags>` extension, falls back to standard `<category>` elements. All entries are eligible regardless of whether they have tags.
+
 | Detail | Value |
 |---|---|
 | **Auth** | `X-Api-Key` header |
@@ -397,6 +426,7 @@ Fetches an RSS feed, applies optional filters (tag exclusion, recency, platform 
 | `platforms` | `string[]` | No | All configured | Target platforms: `bluesky`, `mastodon`, `linkedin`. |
 | `excludeTags` | `string[]` | No | `[]` | Tags to exclude (case-insensitive match against entry tags). |
 | `maxAgeDays` | `int` | No | No limit | Only include entries published within this many days. Must be > 0. |
+| `header` | `string` | No | — | Optional header text prepended between the leader line and the entry title. |
 
 #### Example — Minimal Request
 
@@ -409,7 +439,7 @@ curl -s -X POST https://localhost:7042/api/social-posts/rss-random \
   }'
 ```
 
-#### Example — With Filters
+#### Example — With Filters and Header
 
 ```bash
 curl -s -X POST https://localhost:7042/api/social-posts/rss-random \
@@ -419,7 +449,8 @@ curl -s -X POST https://localhost:7042/api/social-posts/rss-random \
     "feedUrl": "https://example.com/blog/feed.xml",
     "platforms": ["bluesky", "mastodon"],
     "excludeTags": ["personal", "draft"],
-    "maxAgeDays": 30
+    "maxAgeDays": 30,
+    "header": "Check this out!"
   }'
 ```
 

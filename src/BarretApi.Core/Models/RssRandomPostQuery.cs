@@ -9,4 +9,5 @@ public sealed class RssRandomPostQuery
     public IReadOnlyList<string> Platforms { get; init; } = [];
     public IReadOnlyList<string> ExcludeTags { get; init; } = [];
     public int? MaxAgeDays { get; init; }
+    public string? Header { get; init; }
 }
