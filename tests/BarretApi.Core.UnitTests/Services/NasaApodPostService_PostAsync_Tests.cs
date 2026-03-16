@@ -44,10 +44,15 @@ public sealed class NasaApodPostService_PostAsync_Tests
                 AllHashtags = []
             });
 
+        var socialImageResizer = Substitute.For<IImageResizer>();
+        socialImageResizer.ResizeToFit(Arg.Any<byte[]>(), Arg.Any<long>())
+            .Returns(callInfo => callInfo.Arg<byte[]>());
+
         _socialPostService = new SocialPostService(
             [_blueskyClient, _mastodonClient],
             textShorteningService,
             imageDownloadService,
+            socialImageResizer,
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 

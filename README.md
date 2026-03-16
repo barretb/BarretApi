@@ -18,6 +18,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [GET /api/linkedin/auth/callback — LinkedIn OAuth Callback](#get-apilinkedinauthcallback--linkedin-oauth-callback)
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
   - [POST /api/word-cloud — Generate Word Cloud](#post-apiword-cloud--generate-word-cloud)
+  - [GET /api/avatars/random — Generate Random Avatar](#get-apiavatarsrandom--generate-random-avatar)
 - [Configuration](#configuration)
 - [Production Notes](#production-notes)
 
@@ -1021,6 +1022,96 @@ curl -X POST http://localhost:5000/api/word-cloud \
 | Max words in cloud | 100 |
 | Min word length | 3 characters |
 | Image size range | 200×200 to 2000×2000 px |
+
+---
+
+### GET /api/avatars/random — Generate Random Avatar
+
+Generates a random avatar image using the [DiceBear](https://www.dicebear.com/) API (v9.x). Returns the raw image bytes directly. Optionally specify a style, format, and seed for customization.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Method** | `GET` |
+| **Response Content-Type** | Varies by format (default `image/svg+xml`) |
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `style` | `string` | No | Random | One of the 31 supported DiceBear styles (e.g., `pixel-art`, `adventurer`, `bottts`). |
+| `format` | `string` | No | `svg` | Output format: `svg`, `png`, `jpg`, `webp`, or `avif`. |
+| `seed` | `string` | No | Random GUID | Seed for reproducible avatars. Max 256 characters. Same seed + style = same avatar. |
+
+#### Supported Styles
+
+`adventurer`, `adventurer-neutral`, `avataaars`, `avataaars-neutral`, `big-ears`, `big-ears-neutral`, `big-smile`, `bottts`, `bottts-neutral`, `croodles`, `croodles-neutral`, `dylan`, `fun-emoji`, `glass`, `icons`, `identicon`, `initials`, `lorelei`, `lorelei-neutral`, `micah`, `miniavs`, `notionists`, `notionists-neutral`, `open-peeps`, `personas`, `pixel-art`, `pixel-art-neutral`, `rings`, `shapes`, `thumbs`, `toon-head`
+
+#### Example — Random Avatar (Default SVG)
+
+```bash
+curl http://localhost:5000/api/avatars/random \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  --output avatar.svg
+```
+
+#### Example — Specific Style and Format
+
+```bash
+curl "http://localhost:5000/api/avatars/random?style=pixel-art&format=png" \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  --output avatar.png
+```
+
+#### Example — Reproducible Avatar with Seed
+
+```bash
+curl "http://localhost:5000/api/avatars/random?seed=john-doe&style=bottts&format=webp" \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  --output avatar.webp
+```
+
+#### Response — 200 OK
+
+Binary image data with the appropriate `Content-Type` header:
+
+| Format | Content-Type |
+|---|---|
+| `svg` | `image/svg+xml` |
+| `png` | `image/png` |
+| `jpg` | `image/jpeg` |
+| `webp` | `image/webp` |
+| `avif` | `image/avif` |
+
+#### Response — 400 (Validation Error)
+
+```json
+{
+  "statusCode": 400,
+  "message": "One or more validation errors occurred.",
+  "errors": {
+    "style": ["'Style' must be one of the supported styles: adventurer, adventurer-neutral, ..."]
+  }
+}
+```
+
+#### Response — 502 (Upstream Service Unavailable)
+
+```json
+{
+  "statusCode": 502,
+  "message": "The avatar generation service is temporarily unavailable."
+}
+```
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **200** | Avatar image generated successfully. |
+| **400** | Invalid style, format, or seed (exceeds 256 chars). |
+| **401** | Missing or invalid `X-Api-Key`. |
+| **502** | DiceBear API is unreachable or returned an error. |
 
 ---
 

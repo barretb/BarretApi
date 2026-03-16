@@ -23,6 +23,7 @@ public sealed class SatellitePostEndpoint_HandleAsync_Tests
             Array.Empty<ISocialPlatformClient>(),
             Substitute.For<ITextShorteningService>(),
             Substitute.For<IImageDownloadService>(),
+            Substitute.For<IImageResizer>(),
             Substitute.For<IHashtagService>(),
             Substitute.For<ILogger<SocialPostService>>());
 

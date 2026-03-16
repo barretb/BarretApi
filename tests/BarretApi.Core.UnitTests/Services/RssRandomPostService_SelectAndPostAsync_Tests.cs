@@ -77,6 +77,7 @@ public sealed class RssRandomPostService_SelectAndPostAsync_Tests
             [_mockClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 
@@ -238,6 +239,7 @@ public sealed class RssRandomPostService_PlatformTargeting_Tests
             [_blueskyClient, _mastodonClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 
@@ -355,6 +357,7 @@ public sealed class RssRandomPostService_TagExclusion_Tests
             [mockClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             _hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 
@@ -661,6 +664,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
             [mockClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 
@@ -843,6 +847,7 @@ public sealed class RssRandomPostService_HeaderPrepend_Tests
             [_mockClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 

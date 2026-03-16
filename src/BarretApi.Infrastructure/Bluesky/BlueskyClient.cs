@@ -99,7 +99,11 @@ public sealed class BlueskyClient(
             content,
             cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await ReadErrorAsync(response, cancellationToken);
+            throw new HttpRequestException($"Bluesky blob upload failed: {error.errorMessage}");
+        }
 
         var result = await response.Content.ReadFromJsonAsync<BlueskyUploadBlobResponse>(cancellationToken);
 
