@@ -4,6 +4,7 @@ using BarretApi.Core.Configuration;
 using BarretApi.Core.Interfaces;
 using BarretApi.Core.Services;
 using BarretApi.Infrastructure.Bluesky;
+using BarretApi.Infrastructure.DiceBear;
 using BarretApi.Infrastructure.LinkedIn;
 using BarretApi.Infrastructure.Mastodon;
 using BarretApi.Infrastructure.Nasa;
@@ -130,6 +131,14 @@ builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
 });
 builder.Services.AddSingleton<INasaGibsClient>(sp => sp.GetRequiredService<NasaGibsClient>());
 builder.Services.AddSingleton<NasaGibsPostService>();
+
+builder.Services.AddHttpClient<DiceBearAvatarClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.dicebear.com/");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddSingleton<IDiceBearAvatarClient>(sp =>
+    sp.GetRequiredService<DiceBearAvatarClient>());
 
 builder.Services.AddHttpClient<AngleSharpHtmlTextExtractor>();
 builder.Services.AddSingleton<IHtmlTextExtractor>(sp =>

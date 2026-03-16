@@ -53,6 +53,7 @@ public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
             [_platformClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 

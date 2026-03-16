@@ -51,6 +51,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_RecentDaysWindow_Tests
             [platformClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 

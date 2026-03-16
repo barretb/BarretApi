@@ -52,6 +52,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_FeedUrl_Tests
             [_platformClient],
             textShorteningService,
             imageDownloadService,
+            Substitute.For<IImageResizer>(),
             hashtagService,
             Substitute.For<ILogger<SocialPostService>>());
 

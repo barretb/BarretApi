@@ -8,6 +8,7 @@ public sealed class SocialPostService(
     IEnumerable<ISocialPlatformClient> platformClients,
     ITextShorteningService textShorteningService,
     IImageDownloadService imageDownloadService,
+    IImageResizer imageResizer,
     IHashtagService hashtagService,
     ILogger<SocialPostService> logger)
 {
@@ -15,6 +16,7 @@ public sealed class SocialPostService(
         platformClients.ToDictionary(c => c.PlatformName, StringComparer.OrdinalIgnoreCase);
     private readonly ITextShorteningService _textShorteningService = textShorteningService;
     private readonly IImageDownloadService _imageDownloadService = imageDownloadService;
+    private readonly IImageResizer _imageResizer = imageResizer;
     private readonly IHashtagService _hashtagService = hashtagService;
     private readonly ILogger<SocialPostService> _logger = logger;
 
@@ -151,13 +153,14 @@ public sealed class SocialPostService(
             {
                 foreach (var imageData in images)
                 {
+                    var preparedImage = PrepareImageForPlatform(imageData, config);
                     _logger.LogDebug(
                         "Uploading image {FileName} ({ContentType}, {Size} bytes) to {Platform}",
-                        imageData.FileName,
-                        imageData.ContentType,
-                        imageData.Content.Length,
+                        preparedImage.FileName,
+                        preparedImage.ContentType,
+                        preparedImage.Content.Length,
                         client.PlatformName);
-                    var uploaded = await client.UploadImageAsync(imageData, cancellationToken);
+                    var uploaded = await client.UploadImageAsync(preparedImage, cancellationToken);
                     uploadedImages.Add(uploaded);
                 }
             }
@@ -207,5 +210,29 @@ public sealed class SocialPostService(
                 Error = ex
             };
         }
+    }
+
+    private ImageData PrepareImageForPlatform(ImageData image, PlatformConfiguration config)
+    {
+        var resizedBytes = _imageResizer.ResizeToFit(image.Content, config.MaxImageSizeBytes);
+
+        if (ReferenceEquals(resizedBytes, image.Content))
+        {
+            return image;
+        }
+
+        _logger.LogInformation(
+            "Image converted/resized from {OriginalSize} bytes ({OriginalType}) to {NewSize} bytes (image/jpeg)",
+            image.Content.Length,
+            image.ContentType,
+            resizedBytes.Length);
+
+        return new ImageData
+        {
+            Content = resizedBytes,
+            ContentType = "image/jpeg",
+            AltText = image.AltText,
+            FileName = Path.ChangeExtension(image.FileName, ".jpg")
+        };
     }
 }
