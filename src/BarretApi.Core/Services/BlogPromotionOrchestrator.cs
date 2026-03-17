@@ -113,6 +113,7 @@ public sealed class BlogPromotionOrchestrator(
             initialRecord.CanonicalUrl = entry.CanonicalUrl;
             initialRecord.Title = entry.Title;
             initialRecord.PublishedAtUtc = entry.PublishedAtUtc;
+            initialRecord.FeedUrl = effectiveFeedUrl;
             initialRecord.InitialPostAttemptedAtUtc = now;
             initialRecord.LastProcessedAtUtc = now;
 
@@ -148,6 +149,11 @@ public sealed class BlogPromotionOrchestrator(
 
             foreach (var trackedRecord in trackedRecords)
             {
+                if (!string.Equals(trackedRecord.FeedUrl, effectiveFeedUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 if (trackedRecord.InitialPostStatus != PostAttemptStatus.Succeeded)
                 {
                     continue;

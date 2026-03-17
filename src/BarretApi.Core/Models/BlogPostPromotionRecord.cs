@@ -13,6 +13,7 @@ public sealed class BlogPostPromotionRecord
     public required string CanonicalUrl { get; set; }
     public required string Title { get; set; }
     public required DateTimeOffset PublishedAtUtc { get; set; }
+    public string? FeedUrl { get; set; }
     public PostAttemptStatus InitialPostStatus { get; set; } = PostAttemptStatus.NotAttempted;
     public DateTimeOffset? InitialPostAttemptedAtUtc { get; set; }
     public DateTimeOffset? InitialPostSucceededAtUtc { get; set; }
