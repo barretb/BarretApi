@@ -156,6 +156,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_Header_Tests
             CanonicalUrl = url,
             Title = title,
             PublishedAtUtc = Now.AddDays(-3),
+            FeedUrl = "https://example.com/feed.xml",
             InitialPostStatus = PostAttemptStatus.Succeeded,
             InitialPostSucceededAtUtc = Now.AddDays(-2),
             ReminderPostStatus = PostAttemptStatus.NotAttempted,

@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using BarretApi.Core.Configuration;
 using BarretApi.Core.Interfaces;
@@ -18,6 +19,7 @@ public sealed class BlueskyClient(
 {
     private readonly BlueskyOptions _options = options.Value;
     private BlueskySession? _session;
+    private DateTimeOffset _sessionExpiresAtUtc = DateTimeOffset.MinValue;
     private readonly SemaphoreSlim _sessionLock = new(1, 1);
 
     public string PlatformName => "bluesky";
@@ -130,7 +132,7 @@ public sealed class BlueskyClient(
 
     private async Task<BlueskySession> EnsureAuthenticatedAsync(CancellationToken cancellationToken)
     {
-        if (_session is not null)
+        if (_session is not null && _sessionExpiresAtUtc > DateTimeOffset.UtcNow.AddMinutes(2))
         {
             return _session;
         }
@@ -138,18 +140,61 @@ public sealed class BlueskyClient(
         await _sessionLock.WaitAsync(cancellationToken);
         try
         {
-            if (_session is not null)
+            if (_session is not null && _sessionExpiresAtUtc > DateTimeOffset.UtcNow.AddMinutes(2))
             {
                 return _session;
             }
 
+            if (_session is not null)
+            {
+                try
+                {
+                    _session = await RefreshSessionAsync(_session.RefreshJwt, cancellationToken);
+                    _sessionExpiresAtUtc = GetTokenExpiryUtc(_session.AccessJwt);
+                    return _session;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Bluesky session refresh failed, creating new session");
+                    _session = null;
+                }
+            }
+
             _session = await CreateSessionAsync(cancellationToken);
+            _sessionExpiresAtUtc = GetTokenExpiryUtc(_session.AccessJwt);
             return _session;
         }
         finally
         {
             _sessionLock.Release();
         }
+    }
+
+    private async Task<BlueskySession> RefreshSessionAsync(
+        string refreshJwt,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Refreshing Bluesky session");
+
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", refreshJwt);
+
+        var response = await httpClient.PostAsync(
+            "/xrpc/com.atproto.server.refreshSession",
+            null,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await ReadErrorAsync(response, cancellationToken);
+            throw new InvalidOperationException($"Bluesky session refresh failed: {error.errorMessage}");
+        }
+
+        var session = await response.Content.ReadFromJsonAsync<BlueskySession>(cancellationToken)
+            ?? throw new InvalidOperationException("Failed to deserialize Bluesky refresh session response");
+
+        logger.LogInformation("Bluesky session refreshed for {Did}", session.Did);
+        return session;
     }
 
     private async Task<BlueskySession> CreateSessionAsync(CancellationToken cancellationToken)
@@ -237,6 +282,45 @@ public sealed class BlueskyClient(
                 _ => "PLATFORM_ERROR"
             }
         };
+    }
+
+    private static DateTimeOffset GetTokenExpiryUtc(string jwt)
+    {
+        var parts = jwt.Split('.');
+        if (parts.Length != 3)
+        {
+            return DateTimeOffset.MinValue;
+        }
+
+        var payload = parts[1]
+            .Replace('-', '+')
+            .Replace('_', '/');
+
+        switch (payload.Length % 4)
+        {
+            case 2:
+                payload += "==";
+                break;
+            case 3:
+                payload += "=";
+                break;
+        }
+
+        try
+        {
+            var json = Convert.FromBase64String(payload);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("exp", out var exp))
+            {
+                return DateTimeOffset.FromUnixTimeSeconds(exp.GetInt64());
+            }
+        }
+        catch (Exception)
+        {
+            // If JWT parsing fails, return MinValue to force re-authentication
+        }
+
+        return DateTimeOffset.MinValue;
     }
 
     private PlatformPostResult CreateFailureResult(
