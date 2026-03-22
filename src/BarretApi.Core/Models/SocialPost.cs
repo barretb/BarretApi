@@ -3,6 +3,8 @@ namespace BarretApi.Core.Models;
 public sealed class SocialPost
 {
     public required string Text { get; init; }
+    public DateTimeOffset? ScheduledForUtc { get; init; }
+    public string? ScheduledPostId { get; init; }
     public IReadOnlyList<string> Hashtags { get; init; } = [];
     public IReadOnlyList<ImageData> Images { get; init; } = [];
     public IReadOnlyList<ImageUrl> ImageUrls { get; init; } = [];

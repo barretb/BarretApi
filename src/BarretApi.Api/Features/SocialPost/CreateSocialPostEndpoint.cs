@@ -20,6 +20,7 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
                 Text = "Hello from BarretApi! #dotnet #aspire",
                 Hashtags = ["webapi"],
                 Platforms = ["linkedin", "bluesky", "mastodon"],
+                ScheduledFor = DateTimeOffset.Parse("2026-03-03T12:00:00Z"),
                 Images =
                 [
                     new ImageAttachmentRequest
@@ -58,7 +59,8 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
                         ShortenedText = "Hello from BarretApi! #dotnet #aspire #webapi"
                     }
                 ],
-                PostedAt = DateTimeOffset.Parse("2026-03-01T12:00:00Z")
+                PostedAt = DateTimeOffset.Parse("2026-03-01T12:00:00Z"),
+                Scheduled = false
             };
             s.ResponseExamples[207] = new CreateSocialPostResponse
             {
@@ -87,7 +89,8 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
                         ErrorCode = "AUTH_FAILED"
                     }
                 ],
-                PostedAt = DateTimeOffset.Parse("2026-03-01T12:00:00Z")
+                PostedAt = DateTimeOffset.Parse("2026-03-01T12:00:00Z"),
+                Scheduled = false
             };
             s.ResponseExamples[502] = new CreateSocialPostResponse
             {
@@ -115,7 +118,8 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
                         ErrorCode = "PLATFORM_ERROR"
                     }
                 ],
-                PostedAt = DateTimeOffset.Parse("2026-03-01T12:00:00Z")
+                PostedAt = DateTimeOffset.Parse("2026-03-01T12:00:00Z"),
+                Scheduled = false
             };
             s.Responses[200] = "All targeted platforms succeeded.";
             s.Responses[207] = "Partial success: at least one platform succeeded and at least one failed.";
@@ -128,8 +132,19 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
     public override async Task HandleAsync(CreateSocialPostRequest req, CancellationToken ct)
     {
         var socialPost = MapToSocialPost(req);
+
+        if (socialPost.ScheduledForUtc.HasValue)
+        {
+            var scheduledPostId = await postService.ScheduleAsync(socialPost, ct);
+            var scheduledResponse = BuildScheduledResponse(
+                socialPost.ScheduledForUtc.Value,
+                scheduledPostId);
+            await Send.ResponseAsync(scheduledResponse, 200, ct);
+            return;
+        }
+
         var results = await postService.PostAsync(socialPost, ct);
-        var response = BuildResponse(results);
+        var response = BuildImmediateResponse(results);
         var statusCode = DetermineStatusCode(results);
 
         await Send.ResponseAsync(response, statusCode, ct);
@@ -140,6 +155,7 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
         return new SocialPostModel
         {
             Text = req.Text ?? string.Empty,
+            ScheduledForUtc = req.ScheduledFor?.ToUniversalTime(),
             TargetPlatforms = req.Platforms ?? [],
             Hashtags = req.Hashtags ?? [],
             ImageUrls = req.Images?.Select(i => new Core.Models.ImageUrl
@@ -150,7 +166,7 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
         };
     }
 
-    private static CreateSocialPostResponse BuildResponse(IReadOnlyList<Core.Models.PlatformPostResult> results)
+    private static CreateSocialPostResponse BuildImmediateResponse(IReadOnlyList<Core.Models.PlatformPostResult> results)
     {
         return new CreateSocialPostResponse
         {
@@ -164,7 +180,22 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
                 Error = r.Success ? null : r.ErrorMessage,
                 ErrorCode = r.Success ? null : r.ErrorCode
             }).ToList(),
-            PostedAt = DateTimeOffset.UtcNow
+            PostedAt = DateTimeOffset.UtcNow,
+            Scheduled = false
+        };
+    }
+
+    private static CreateSocialPostResponse BuildScheduledResponse(
+        DateTimeOffset scheduledFor,
+        string scheduledPostId)
+    {
+        return new CreateSocialPostResponse
+        {
+            Results = [],
+            PostedAt = null,
+            Scheduled = true,
+            ScheduledPostId = scheduledPostId,
+            ScheduledFor = scheduledFor
         };
     }
 

@@ -3,7 +3,10 @@ namespace BarretApi.Api.Features.SocialPost;
 public sealed class CreateSocialPostResponse
 {
     public required List<PlatformResult> Results { get; init; }
-    public required DateTimeOffset PostedAt { get; init; }
+    public DateTimeOffset? PostedAt { get; init; }
+    public bool Scheduled { get; init; }
+    public string? ScheduledPostId { get; init; }
+    public DateTimeOffset? ScheduledFor { get; init; }
 }
 
 public sealed class PlatformResult

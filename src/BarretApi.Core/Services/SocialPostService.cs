@@ -10,7 +10,8 @@ public sealed class SocialPostService(
     IImageDownloadService imageDownloadService,
     IImageResizer imageResizer,
     IHashtagService hashtagService,
-    ILogger<SocialPostService> logger)
+    ILogger<SocialPostService> logger,
+    IScheduledSocialPostRepository? scheduledSocialPostRepository = null)
 {
     private readonly IReadOnlyDictionary<string, ISocialPlatformClient> _clients =
         platformClients.ToDictionary(c => c.PlatformName, StringComparer.OrdinalIgnoreCase);
@@ -19,6 +20,63 @@ public sealed class SocialPostService(
     private readonly IImageResizer _imageResizer = imageResizer;
     private readonly IHashtagService _hashtagService = hashtagService;
     private readonly ILogger<SocialPostService> _logger = logger;
+    private readonly IScheduledSocialPostRepository? _scheduledSocialPostRepository = scheduledSocialPostRepository;
+
+    public async Task<string> ScheduleAsync(
+        SocialPost post,
+        CancellationToken cancellationToken = default)
+    {
+        if (_scheduledSocialPostRepository is null)
+        {
+            throw new InvalidOperationException("Scheduled social post repository is not configured.");
+        }
+
+        if (!post.ScheduledForUtc.HasValue)
+        {
+            throw new InvalidOperationException("ScheduledForUtc is required when scheduling a post.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var scheduledForUtc = post.ScheduledForUtc.Value.ToUniversalTime();
+        if (scheduledForUtc <= now)
+        {
+            throw new InvalidOperationException("ScheduledForUtc must be in the future.");
+        }
+
+        var scheduledPostId = post.ScheduledPostId ?? Guid.NewGuid().ToString("N");
+        var record = new ScheduledSocialPostRecord
+        {
+            ScheduledPostId = scheduledPostId,
+            ScheduledForUtc = scheduledForUtc,
+            Status = ScheduledPostStatus.Pending,
+            Text = post.Text,
+            Hashtags = post.Hashtags,
+            TargetPlatforms = post.TargetPlatforms,
+            ImageUrls = post.ImageUrls,
+            UploadedImages = post.Images.Select(image => new StoredImageData
+            {
+                ContentBase64 = Convert.ToBase64String(image.Content),
+                ContentType = image.ContentType,
+                AltText = image.AltText,
+                FileName = image.FileName
+            }).ToList(),
+            CreatedAtUtc = now,
+            LastAttemptedAtUtc = null,
+            PublishedAtUtc = null,
+            LastErrorCode = null,
+            LastErrorMessage = null,
+            AttemptCount = 0
+        };
+
+        await _scheduledSocialPostRepository.SaveScheduledAsync(record, cancellationToken);
+
+        _logger.LogInformation(
+            "Scheduled social post {ScheduledPostId} for {ScheduledForUtc}",
+            scheduledPostId,
+            scheduledForUtc);
+
+        return scheduledPostId;
+    }
 
     public async Task<IReadOnlyList<PlatformPostResult>> PostAsync(
         SocialPost post,

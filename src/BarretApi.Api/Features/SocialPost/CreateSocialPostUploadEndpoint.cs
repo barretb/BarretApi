@@ -9,6 +9,7 @@ namespace BarretApi.Api.Features.SocialPost;
 public sealed class CreateSocialPostUploadRequest
 {
     public string? Text { get; set; }
+    public DateTimeOffset? ScheduledFor { get; set; }
     public List<string>? Hashtags { get; set; }
     public List<string>? Platforms { get; set; }
     public List<IFormFile>? Images { get; set; }
@@ -44,6 +45,7 @@ public sealed class CreateSocialPostUploadEndpoint(SocialPostService postService
                 Text = "Hello from BarretApi! #dotnet #aspire",
                 Hashtags = ["webapi"],
                 Platforms = ["bluesky", "mastodon"],
+                ScheduledFor = DateTimeOffset.Parse("2026-03-03T12:00:00Z"),
                 AltTexts = ["A descriptive alt text for the uploaded image"]
             };
             s.ResponseExamples[200] = new CreateSocialPostResponse
@@ -122,6 +124,13 @@ public sealed class CreateSocialPostUploadEndpoint(SocialPostService postService
 
     public override async Task HandleAsync(CreateSocialPostUploadRequest req, CancellationToken ct)
     {
+        if (req.ScheduledFor.HasValue && req.ScheduledFor.Value <= DateTimeOffset.UtcNow)
+        {
+            AddError("ScheduledFor must be in the future.");
+            await Send.ErrorsAsync(cancellation: ct);
+            return;
+        }
+
         var images = await ConvertToImageDataAsync(req, ct);
         if (images is null)
         {
@@ -129,8 +138,18 @@ public sealed class CreateSocialPostUploadEndpoint(SocialPostService postService
         }
 
         var socialPost = MapToSocialPost(req, images);
+        if (socialPost.ScheduledForUtc.HasValue)
+        {
+            var scheduledPostId = await _postService.ScheduleAsync(socialPost, ct);
+            var scheduledResponse = BuildScheduledResponse(
+                socialPost.ScheduledForUtc.Value,
+                scheduledPostId);
+            await Send.ResponseAsync(scheduledResponse, 200, ct);
+            return;
+        }
+
         var results = await _postService.PostAsync(socialPost, ct);
-        var response = BuildResponse(results);
+        var response = BuildImmediateResponse(results);
         var statusCode = DetermineStatusCode(results);
 
         await Send.ResponseAsync(response, statusCode, ct);
@@ -216,13 +235,14 @@ public sealed class CreateSocialPostUploadEndpoint(SocialPostService postService
         return new SocialPostModel
         {
             Text = req.Text ?? string.Empty,
+            ScheduledForUtc = req.ScheduledFor?.ToUniversalTime(),
             TargetPlatforms = req.Platforms ?? [],
             Hashtags = req.Hashtags ?? [],
             Images = images
         };
     }
 
-    private static CreateSocialPostResponse BuildResponse(IReadOnlyList<PlatformPostResult> results)
+    private static CreateSocialPostResponse BuildImmediateResponse(IReadOnlyList<PlatformPostResult> results)
     {
         return new CreateSocialPostResponse
         {
@@ -236,7 +256,22 @@ public sealed class CreateSocialPostUploadEndpoint(SocialPostService postService
                 Error = r.Success ? null : r.ErrorMessage,
                 ErrorCode = r.Success ? null : r.ErrorCode
             }).ToList(),
-            PostedAt = DateTimeOffset.UtcNow
+            PostedAt = DateTimeOffset.UtcNow,
+            Scheduled = false
+        };
+    }
+
+    private static CreateSocialPostResponse BuildScheduledResponse(
+        DateTimeOffset scheduledFor,
+        string scheduledPostId)
+    {
+        return new CreateSocialPostResponse
+        {
+            Results = [],
+            PostedAt = null,
+            Scheduled = true,
+            ScheduledPostId = scheduledPostId,
+            ScheduledFor = scheduledFor
         };
     }
 

@@ -3,6 +3,7 @@ namespace BarretApi.Api.Features.SocialPost;
 public sealed class CreateSocialPostRequest
 {
     public string? Text { get; init; }
+    public DateTimeOffset? ScheduledFor { get; init; }
     public List<string>? Hashtags { get; init; }
     public List<string>? Platforms { get; init; }
     public List<ImageAttachmentRequest>? Images { get; init; }
