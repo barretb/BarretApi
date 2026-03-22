@@ -19,6 +19,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - Azure Table Storage (existing — no schema changes needed; tracking is per-entry identity, unaffected by feed format) (006-atom-feed-support)
 - C# / .NET 10.0 (`net10.0`) + FastEndpoints 8.x, Aspire 13, Microsoft.Extensions.Http.Resilience (007-dicebear-avatar)
 - N/A — no persistence required; avatars are generated on-demand from upstream API (007-dicebear-avatar)
+- C# / .NET 10.0 (`net10.0`) + FastEndpoints, FluentValidation, Microsoft.Extensions.Logging, existing social platform clients (Bluesky, Mastodon, LinkedIn), Azure.Data.Tables (existing persistence pattern) (001-social-post-scheduling)
+- Azure Table Storage for scheduled-post durable state (new table/entity set), using existing infrastructure persistence approach (001-social-post-scheduling)
 
 - C# / .NET 10.0 (`net10.0`), latest language features, nullable reference types enabled + FastEndpoints 7.x, Aspire 13 (AppHost + ServiceDefaults), FluentValidation, Microsoft.Extensions.Http (for HttpClientFactory with Polly retry) (001-social-post-api)
 
@@ -39,9 +41,9 @@ tests/
 C# / .NET 10.0 (`net10.0`), latest language features, nullable reference types enabled: Follow standard conventions
 
 ## Recent Changes
+- 001-social-post-scheduling: Added C# / .NET 10.0 (`net10.0`) + FastEndpoints, FluentValidation, Microsoft.Extensions.Logging, existing social platform clients (Bluesky, Mastodon, LinkedIn), Azure.Data.Tables (existing persistence pattern)
 - 007-dicebear-avatar: Added C# / .NET 10.0 (`net10.0`) + FastEndpoints 8.x, Aspire 13, Microsoft.Extensions.Http.Resilience
 - 006-atom-feed-support: Added C# (latest) on .NET 10.0 (`net10.0`), Aspire 13 + FastEndpoints 8.0.0, System.ServiceModel.Syndication 8.0.0, AngleSharp 1.4.0 (already in solution for HTML processing)
-- 005-rss-reminder-header: Added C# (latest) on .NET 10.0, Aspire 13 + FastEndpoints 7.x, Microsoft.Extensions.Options
 
 
 <!-- MANUAL ADDITIONS START -->

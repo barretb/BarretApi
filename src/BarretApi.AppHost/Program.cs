@@ -17,6 +17,9 @@ var blogPromotionEnableReminderPosts = builder.AddParameter("blog-promotion-enab
 var blogPromotionReminderDelayHours = builder.AddParameter("blog-promotion-reminder-delay-hours");
 var blogPromotionTableStorageTableName = builder.AddParameter("blog-promotion-table-storage-table-name");
 var blogPromotionTableStoragePartitionKey = builder.AddParameter("blog-promotion-table-storage-partition-key");
+var scheduledSocialPostMaxBatchSize = builder.AddParameter("scheduled-social-post-max-batch-size");
+var scheduledSocialPostTableStorageTableName = builder.AddParameter("scheduled-social-post-table-storage-table-name");
+var scheduledSocialPostTableStoragePartitionKey = builder.AddParameter("scheduled-social-post-table-storage-partition-key");
 var nasaApodApiKey = builder.AddParameter("nasa-apod-api-key", secret: true);
 var gibsBaseUrl = builder.AddParameter("gibs-base-url");
 var gibsDefaultLayer = builder.AddParameter("gibs-default-layer");
@@ -58,6 +61,10 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("BlogPromotion__TableStorage__ConnectionString", azuriteConnectionString)
     .WithEnvironment("BlogPromotion__TableStorage__TableName", blogPromotionTableStorageTableName)
     .WithEnvironment("BlogPromotion__TableStorage__PartitionKey", blogPromotionTableStoragePartitionKey)
+    .WithEnvironment("ScheduledSocialPost__MaxBatchSize", scheduledSocialPostMaxBatchSize)
+    .WithEnvironment("ScheduledSocialPost__TableStorage__ConnectionString", azuriteConnectionString)
+    .WithEnvironment("ScheduledSocialPost__TableStorage__TableName", scheduledSocialPostTableStorageTableName)
+    .WithEnvironment("ScheduledSocialPost__TableStorage__PartitionKey", scheduledSocialPostTableStoragePartitionKey)
     .WithEnvironment("NasaApod__ApiKey", nasaApodApiKey)
     .WithEnvironment("NasaGibs__BaseUrl", gibsBaseUrl)
     .WithEnvironment("NasaGibs__DefaultLayer", gibsDefaultLayer)

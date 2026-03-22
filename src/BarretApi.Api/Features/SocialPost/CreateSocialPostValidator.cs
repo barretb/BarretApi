@@ -58,6 +58,11 @@ public sealed class CreateSocialPostValidator : Validator<CreateSocialPostReques
             .Must(tag => !tag.Contains(' '))
             .WithMessage("Hashtags must not contain spaces.")
             .When(x => x.Hashtags is not null && x.Hashtags.Count > 0);
+
+        RuleFor(x => x.ScheduledFor)
+            .Must(scheduledFor => scheduledFor > DateTimeOffset.UtcNow)
+            .When(x => x.ScheduledFor.HasValue)
+            .WithMessage("ScheduledFor must be in the future.");
     }
 
     private static bool BeAValidAbsoluteHttpUrl(string url)

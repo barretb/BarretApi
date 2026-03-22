@@ -44,6 +44,12 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<BlogPromotionOptions>>(
     new OptionsValidatorAdapter<BlogPromotionOptions>(o => o.Validate()));
+builder.Services
+    .AddOptions<ScheduledSocialPostOptions>()
+    .Bind(builder.Configuration.GetSection(ScheduledSocialPostOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<ScheduledSocialPostOptions>>(
+    new OptionsValidatorAdapter<ScheduledSocialPostOptions>(o => o.Validate()));
 
 builder.Services
     .AddAuthentication(ApiKeyAuthHandler.SchemeName)
@@ -106,7 +112,9 @@ builder.Services.AddSingleton<IHashtagService, HashtagService>();
 builder.Services.AddSingleton<IImageDownloadService>(sp =>
     sp.GetRequiredService<ImageDownloadService>());
 builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPromotionRepository>();
+builder.Services.AddSingleton<IScheduledSocialPostRepository, AzureTableScheduledSocialPostRepository>();
 builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
+builder.Services.AddSingleton<IScheduledSocialPostProcessor, ScheduledSocialPostProcessor>();
 builder.Services.AddSingleton<SocialPostService>();
 builder.Services.AddSingleton<RssRandomPostService>();
 

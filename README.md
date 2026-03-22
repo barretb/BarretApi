@@ -10,6 +10,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
 - [API Endpoints](#api-endpoints)
   - [POST /api/social-posts — Create Social Post (JSON)](#post-apisocial-posts--create-social-post-json)
   - [POST /api/social-posts/upload — Create Social Post (Multipart Upload)](#post-apisocial-postsupload--create-social-post-multipart-upload)
+  - [POST /api/social-posts/scheduled/process — Process Due Scheduled Posts](#post-apisocial-postsscheduledprocess--process-due-scheduled-posts)
   - [POST /api/social-posts/rss-promotion — Trigger RSS Blog Promotion](#post-apisocial-postsrss-promotion--trigger-rss-blog-promotion)
   - [POST /api/social-posts/rss-random — Post Random RSS Entry](#post-apisocial-postsrss-random--post-random-rss-entry)
   - [POST /api/social-posts/nasa-apod — Post NASA APOD to Social Platforms](#post-apisocial-postsnasa-apod--post-nasa-apod-to-social-platforms)
@@ -90,6 +91,7 @@ Creates a cross-platform social post. Images are supplied as URL references and 
 | `text` | `string` | Yes (if no images) | Post body text (max 10,000 chars). |
 | `hashtags` | `string[]` | No | Hashtags to append (no spaces, max 100 chars each). |
 | `platforms` | `string[]` | No | Target platforms: `bluesky`, `mastodon`, `linkedin`. |
+| `scheduledFor` | `string` (ISO 8601) | No | Future UTC datetime for deferred posting. When set, request is queued and not published immediately. |
 | `images` | `object[]` | No | Up to 4 image references. |
 | `images[].url` | `string` | Yes | Absolute URL of the image. |
 | `images[].altText` | `string` | Yes | Alt text for the image (max 1,500 chars). |
@@ -138,6 +140,33 @@ POST /api/social-posts
   "text": "Exploring the new .NET 10 features today",
   "hashtags": ["dotnet", "csharp", "aspire"],
   "platforms": ["bluesky", "mastodon"]
+}
+```
+
+#### Example — Schedule a Post for Later
+
+```http
+POST /api/social-posts
+```
+
+```json
+{
+  "text": "Launching the release announcement tomorrow morning.",
+  "hashtags": ["release", "dotnet"],
+  "platforms": ["linkedin", "bluesky"],
+  "scheduledFor": "2026-03-23T14:30:00Z"
+}
+```
+
+#### Response — 200 OK (Scheduled)
+
+```json
+{
+  "results": [],
+  "postedAt": null,
+  "scheduled": true,
+  "scheduledPostId": "sp_01HZYD3M5Q9K6Q",
+  "scheduledFor": "2026-03-23T14:30:00+00:00"
 }
 ```
 
@@ -247,6 +276,7 @@ Creates a cross-platform social post with images uploaded as files via `multipar
 | `text` | `string` | Yes (if no images) | Post body text (max 10,000 chars). |
 | `hashtags` | `string[]` | No | Hashtags to append. |
 | `platforms` | `string[]` | No | Target platforms: `bluesky`, `mastodon`, `linkedin`. |
+| `scheduledFor` | `string` (ISO 8601) | No | Future UTC datetime for deferred posting. |
 | `images` | `file[]` | No | Up to 4 image files (JPEG, PNG, GIF, WebP; max 1 MB each). |
 | `altTexts` | `string[]` | Yes (if images) | One alt text per image, matched by position (max 1,500 chars each). |
 
@@ -279,9 +309,36 @@ Content-Type: multipart/form-data
 | `images` | `before.jpg`, `after.jpg` |
 | `altTexts` | `Before the refactor`, `After the refactor` |
 
+#### Example — Schedule an Upload Post for Later
+
+```http
+POST /api/social-posts/upload
+Content-Type: multipart/form-data
+```
+
+| Field | Value |
+|---|---|
+| `text` | `Scheduled image post for tomorrow` |
+| `platforms` | `bluesky`, `mastodon` |
+| `scheduledFor` | `2026-03-23T16:00:00Z` |
+| `images` | `launch-banner.png` |
+| `altTexts` | `Launch banner showing feature highlights` |
+
 #### Response
 
 Same response shape and status codes as [`POST /api/social-posts`](#post-apisocial-posts--create-social-post-json).
+
+When `scheduledFor` is provided and is in the future, the response indicates the post was scheduled:
+
+```json
+{
+  "results": [],
+  "postedAt": null,
+  "scheduled": true,
+  "scheduledPostId": "sp_01HZYD3M5Q9K6Q",
+  "scheduledFor": "2026-03-23T20:00:00+00:00"
+}
+```
 
 #### Image Constraints
 
@@ -290,6 +347,73 @@ Same response shape and status codes as [`POST /api/social-posts`](#post-apisoci
 - **Max 1 MB** per image.
 - Alt text count **must** match image count.
 - Alt texts must not be blank and must not exceed 1,500 characters.
+
+---
+
+### POST /api/social-posts/scheduled/process — Process Due Scheduled Posts
+
+Processes scheduled posts that are due (`scheduledFor <= now`), posts them to configured target platforms, and returns run metrics.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `maxCount` | `int` | No | Optional cap for number of due posts to process in a single run (1-1000). |
+
+#### Example
+
+```http
+POST /api/social-posts/scheduled/process
+```
+
+```json
+{
+  "maxCount": 100
+}
+```
+
+#### Response — 200 OK (All Attempted or Partial Success)
+
+```json
+{
+  "runId": "sched-run-20260322180000-a1b2c3",
+  "startedAtUtc": "2026-03-22T18:00:00+00:00",
+  "completedAtUtc": "2026-03-22T18:00:03+00:00",
+  "dueCount": 3,
+  "attemptedCount": 3,
+  "succeededCount": 2,
+  "failedCount": 1,
+  "skippedCount": 0,
+  "failures": [
+    {
+      "scheduledPostId": "sp_01HZYD3M5Q9K6Q",
+      "scheduledForUtc": "2026-03-22T17:59:00+00:00",
+      "platforms": ["bluesky", "mastodon"],
+      "errorCode": "PLATFORM_ERROR",
+      "errorMessage": "No platform succeeded for the scheduled post.",
+      "attemptedAtUtc": "2026-03-22T18:00:02+00:00"
+    }
+  ]
+}
+```
+
+#### Response — 502 Bad Gateway (All Attempts Failed)
+
+Returned when at least one due post was attempted and no attempts succeeded.
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **200** | Processing completed with at least one success, or no due posts to process. |
+| **400** | Request validation failed. |
+| **401** | Missing or invalid `X-Api-Key`. |
+| **502** | Due posts were attempted and all attempts failed. |
 
 ---
 
