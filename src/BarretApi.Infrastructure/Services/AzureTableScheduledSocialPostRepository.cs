@@ -17,6 +17,7 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
     private readonly ScheduledSocialPostOptions _options;
     private readonly ILogger<AzureTableScheduledSocialPostRepository> _logger;
     private readonly TableClient _tableClient;
+    private readonly TableServiceClient _tableServiceClient;
     private readonly string _tableName;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private bool _initialized;
@@ -32,12 +33,16 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
 
         if (!string.IsNullOrWhiteSpace(_options.TableStorage.ConnectionString))
         {
+            _tableServiceClient = new TableServiceClient(_options.TableStorage.ConnectionString);
             _tableClient = new TableClient(
                 _options.TableStorage.ConnectionString,
                 _tableName);
         }
         else
         {
+            _tableServiceClient = new TableServiceClient(
+                new Uri(_options.TableStorage.AccountEndpoint),
+                new DefaultAzureCredential());
             _tableClient = new TableClient(
                 new Uri(_options.TableStorage.AccountEndpoint),
                 _tableName,
@@ -187,9 +192,33 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
             }
             catch (RequestFailedException ex) when (ex.Status == 400)
             {
-                throw new InvalidOperationException(
-                    $"Failed to create or access Azure Table '{_tableName}'. Verify ScheduledSocialPost table configuration, especially the table name and storage account settings.",
-                    ex);
+                var createdWithFallback = await TryCreateWithServiceClientAsync(cancellationToken);
+
+                if (createdWithFallback)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "TableClient.CreateIfNotExists failed for table {TableName}, but TableServiceClient fallback succeeded.",
+                        _tableName);
+                }
+
+                // Some environments block table creation but still allow read/write to an existing table.
+                // Probe access before failing so we can keep working with pre-provisioned tables.
+                var canAccessExistingTable = await CanAccessExistingTableAsync(cancellationToken);
+                if (!createdWithFallback && !canAccessExistingTable)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to create or access Azure Table '{_tableName}'. Verify ScheduledSocialPost table configuration and ensure the table exists. In restricted environments, pre-create the table and grant the app data-plane access.",
+                        ex);
+                }
+
+                if (!createdWithFallback && canAccessExistingTable)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "CreateIfNotExists failed for table {TableName}, but table access probe succeeded. Continuing with existing table.",
+                        _tableName);
+                }
             }
 
             _initialized = true;
@@ -201,6 +230,36 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
         finally
         {
             _initializationLock.Release();
+        }
+    }
+
+    private async Task<bool> CanAccessExistingTableAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var _ in _tableClient.QueryAsync<TableEntity>(maxPerPage: 1, cancellationToken: cancellationToken))
+            {
+                break;
+            }
+
+            return true;
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> TryCreateWithServiceClientAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _tableServiceClient.CreateTableIfNotExistsAsync(_tableName, cancellationToken: cancellationToken);
+            return true;
+        }
+        catch (RequestFailedException)
+        {
+            return false;
         }
     }
 
