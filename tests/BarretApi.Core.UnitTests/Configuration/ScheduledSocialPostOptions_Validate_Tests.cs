@@ -16,6 +16,10 @@ public sealed class ScheduledSocialPostOptions_Validate_Tests
 				TableName = "scheduled-social-post",
 				PartitionKey = "scheduled-social-post"
 			},
+			BlobStorage = new ScheduledSocialPostBlobStorageOptions
+			{
+				ConnectionString = "UseDevelopmentStorage=true"
+			},
 			MaxBatchSize = 100
 		};
 
@@ -43,6 +47,10 @@ public sealed class ScheduledSocialPostOptions_Validate_Tests
 				ConnectionString = "UseDevelopmentStorage=true",
 				TableName = "scheduledsocialposts",
 				PartitionKey = "scheduled-social-post"
+			},
+			BlobStorage = new ScheduledSocialPostBlobStorageOptions
+			{
+				ConnectionString = "UseDevelopmentStorage=true"
 			},
 			MaxBatchSize = 100
 		};
