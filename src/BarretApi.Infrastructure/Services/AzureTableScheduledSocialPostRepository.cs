@@ -205,9 +205,27 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
             ["ImageUrls"] = JsonSerializer.Serialize(record.ImageUrls, JsonOptions),
             ["UploadedImages"] = JsonSerializer.Serialize(record.UploadedImages, JsonOptions),
             ["CreatedAtUtc"] = record.CreatedAtUtc,
-            ["AttemptCount"] = record.AttemptCount,
-            ["LastErrorCode"] = record.LastErrorCode ?? string.Empty,
-            ["LastErrorMessage"] = record.LastErrorMessage ?? string.Empty
+            ["AttemptCount"] = record.AttemptCount
+        };
+
+        if (record.LastAttemptedAtUtc.HasValue)
+        {
+            entity["LastAttemptedAtUtc"] = record.LastAttemptedAtUtc.Value;
+        }
+
+        if (record.PublishedAtUtc.HasValue)
+        {
+            entity["PublishedAtUtc"] = record.PublishedAtUtc.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(record.LastErrorCode))
+        {
+            entity["LastErrorCode"] = record.LastErrorCode;
+        }
+
+        if (!string.IsNullOrWhiteSpace(record.LastErrorMessage))
+        {
+            entity["LastErrorMessage"] = record.LastErrorMessage;
         };
 
         if (record.LastAttemptedAtUtc.HasValue)
@@ -241,8 +259,8 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
             CreatedAtUtc = entity.GetDateTimeOffset("CreatedAtUtc") ?? DateTimeOffset.MinValue,
             LastAttemptedAtUtc = entity.GetDateTimeOffset("LastAttemptedAtUtc"),
             PublishedAtUtc = entity.GetDateTimeOffset("PublishedAtUtc"),
-            LastErrorCode = NullIfEmpty(entity.GetString("LastErrorCode")),
-            LastErrorMessage = NullIfEmpty(entity.GetString("LastErrorMessage")),
+                LastErrorCode = entity.GetString("LastErrorCode"),
+                LastErrorMessage = entity.GetString("LastErrorMessage"),
             AttemptCount = entity.GetInt32("AttemptCount") ?? 0
         };
     }
