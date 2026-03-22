@@ -1320,6 +1320,7 @@ ScheduledSocialPost__TableStorage__ConnectionString = (same value as LinkedIn__T
 ```
 - **Option A (Shared Connection String):** Set `ScheduledSocialPost__TableStorage__ConnectionString` to your Azure Storage account connection string (simplest for single-account deployments).
 - **Option B (Managed Identity):** Set `ScheduledSocialPost__TableStorage__AccountEndpoint` and configure managed identity on your Azure resource.
+- **Table Name Rule:** `ScheduledSocialPost__TableStorage__TableName` must be 3-63 chars, start with a letter, and contain letters/numbers only. Use lowercase values such as `scheduledsocialposts`.
 
 ### NASA APOD
 
@@ -1366,6 +1367,8 @@ export ScheduledSocialPost__TableStorage__ConnectionString="DefaultEndpointsProt
 Each feature uses its own table name (`linkedintokens`, `blogpostpromotions`, `scheduledsocialposts`), so there's no conflict.
 
 **Error:** If neither `ConnectionString` nor `AccountEndpoint` is set, the API will fail at startup with `OptionsValidationException: ScheduledSocialPost:TableStorage:ConnectionString or AccountEndpoint must be configured.`
+
+If scheduled-post requests fail with a table initialization error, verify `ScheduledSocialPost__TableStorage__TableName` is lowercase alphanumeric (example: `scheduledsocialposts`) and restart the app after updating app settings.
 
 ### LinkedIn Rollout Checklist
 
