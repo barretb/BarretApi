@@ -1301,6 +1301,26 @@ Settings shown with `—` for the Aspire parameter are hardcoded in the AppHost 
 | `BlogPromotion:TableStorage:TableName` | `blog-promotion-table-storage-table-name` | `BlogPromotion__TableStorage__TableName` | No | `blogpostpromotions` | Table name for promotion tracking records. |
 | `BlogPromotion:TableStorage:PartitionKey` | `blog-promotion-table-storage-partition-key` | `BlogPromotion__TableStorage__PartitionKey` | No | `blog-promotion` | Partition key for promotion records. |
 
+### Scheduled Social Posts
+
+Scheduled posts are stored in Azure Table Storage and processed on-demand via `/api/social-posts/scheduled/process`. At least one storage option must be configured.
+
+| Config Key | Aspire Parameter | Environment Variable | Required | Default | Description |
+|---|---|---|---|---|---|
+| `ScheduledSocialPost:MaxBatchSize` | `scheduled-social-post-max-batch-size` | `ScheduledSocialPost__MaxBatchSize` | No | `100` | Max posts to process per request (1–1000). |
+| `ScheduledSocialPost:TableStorage:ConnectionString` | — | `ScheduledSocialPost__TableStorage__ConnectionString` | No* | — | Azure Table Storage connection string. **See note below.** |
+| `ScheduledSocialPost:TableStorage:AccountEndpoint` | — | `ScheduledSocialPost__TableStorage__AccountEndpoint` | No* | — | Azure Table Storage account endpoint (e.g., `https://myaccount.table.core.windows.net`). Use with managed identity. |
+| `ScheduledSocialPost:TableStorage:TableName` | `scheduled-social-post-table-storage-table-name` | `ScheduledSocialPost__TableStorage__TableName` | No | `scheduledsocialposts` | Table name for scheduled post records. |
+| `ScheduledSocialPost:TableStorage:PartitionKey` | `scheduled-social-post-table-storage-partition-key` | `ScheduledSocialPost__TableStorage__PartitionKey` | No | `scheduled-social-post` | Partition key for scheduled post records. |
+
+**Storage Configuration Note:**  
+Either `ConnectionString` **or** `AccountEndpoint` must be set. **In production, you can reuse the same storage account connection string across LinkedIn token storage, blog promotion, and scheduled posts** — they use different table names, so no conflict occurs. For example, if you already have `LinkedIn__TokenStorage__ConnectionString` configured, you can set:
+```
+ScheduledSocialPost__TableStorage__ConnectionString = (same value as LinkedIn__TokenStorage__ConnectionString)
+```
+- **Option A (Shared Connection String):** Set `ScheduledSocialPost__TableStorage__ConnectionString` to your Azure Storage account connection string (simplest for single-account deployments).
+- **Option B (Managed Identity):** Set `ScheduledSocialPost__TableStorage__AccountEndpoint` and configure managed identity on your Azure resource.
+
 ### NASA APOD
 
 | Config Key | Aspire Parameter | Environment Variable | Required | Default | Description |
@@ -1328,6 +1348,24 @@ No API key required — NASA GIBS is publicly accessible.
 ### HTTPS Requirement
 
 Always call production endpoints using `https://`. Using `http://` may result in redirect behavior where clients retry with the wrong method and receive `405 Method Not Allowed`.
+
+### Scheduled Posts Configuration
+
+Before deploying to production, ensure **at least one** of the following is configured:
+- `ScheduledSocialPost__TableStorage__ConnectionString` — Can reuse your existing Azure Storage account (same as LinkedIn or Blog Promotion if using one storage account)
+- `ScheduledSocialPost__TableStorage__AccountEndpoint` — Set to your table storage account endpoint and configure managed identity
+
+**Unified Storage Pattern (Recommended):**  
+If you have a single Azure Storage account for all features:
+```bash
+# Set the same connection string for all table storage features
+export LinkedIn__TokenStorage__ConnectionString="DefaultEndpointsProtocol=..."
+export BlogPromotion__TableStorage__ConnectionString="DefaultEndpointsProtocol=..."  # Same
+export ScheduledSocialPost__TableStorage__ConnectionString="DefaultEndpointsProtocol=..."  # Same
+```
+Each feature uses its own table name (`linkedintokens`, `blogpostpromotions`, `scheduledsocialposts`), so there's no conflict.
+
+**Error:** If neither `ConnectionString` nor `AccountEndpoint` is set, the API will fail at startup with `OptionsValidationException: ScheduledSocialPost:TableStorage:ConnectionString or AccountEndpoint must be configured.`
 
 ### LinkedIn Rollout Checklist
 

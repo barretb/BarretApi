@@ -19,16 +19,23 @@ public sealed class ScheduledSocialPostOptions
             return "ScheduledSocialPost:MaxBatchSize must not exceed 1000.";
         }
 
-        if (!Uri.TryCreate(TableStorage.AccountEndpoint, UriKind.Absolute, out var endpointUri))
+        // Only validate AccountEndpoint if it's explicitly provided
+        if (!string.IsNullOrWhiteSpace(TableStorage.AccountEndpoint))
         {
-            if (string.IsNullOrWhiteSpace(TableStorage.ConnectionString))
+            if (!Uri.TryCreate(TableStorage.AccountEndpoint, UriKind.Absolute, out var endpointUri))
             {
-                return "ScheduledSocialPost:TableStorage:AccountEndpoint must be a valid absolute URL when ConnectionString is not set.";
+                return "ScheduledSocialPost:TableStorage:AccountEndpoint must be a valid absolute URL if provided.";
+            }
+
+            if (endpointUri.Scheme is not "https")
+            {
+                return "ScheduledSocialPost:TableStorage:AccountEndpoint must use https.";
             }
         }
-        else if (endpointUri.Scheme is not "https")
+        else if (string.IsNullOrWhiteSpace(TableStorage.ConnectionString))
         {
-            return "ScheduledSocialPost:TableStorage:AccountEndpoint must use https when ConnectionString is not set.";
+            // If neither AccountEndpoint nor ConnectionString is provided, require ConnectionString
+            return "ScheduledSocialPost:TableStorage:ConnectionString or AccountEndpoint must be configured.";
         }
 
         if (string.IsNullOrWhiteSpace(TableStorage.TableName))
