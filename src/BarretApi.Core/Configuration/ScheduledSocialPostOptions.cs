@@ -5,6 +5,7 @@ public sealed class ScheduledSocialPostOptions
     public const string SectionName = "ScheduledSocialPost";
 
     public ScheduledSocialPostTableStorageOptions TableStorage { get; init; } = new();
+    public ScheduledSocialPostBlobStorageOptions BlobStorage { get; init; } = new();
     public int MaxBatchSize { get; init; } = 100;
 
     public string? Validate()
@@ -53,7 +54,49 @@ public sealed class ScheduledSocialPostOptions
             return "ScheduledSocialPost:TableStorage:PartitionKey is required.";
         }
 
+        if (!IsValidBlobContainerName(BlobStorage.ContainerName))
+        {
+            return "ScheduledSocialPost:BlobStorage:ContainerName must be a valid Azure Blob container name (3-63 lowercase characters, letters, numbers, and hyphens only, starting and ending with a letter or number).";
+        }
+
         return null;
+    }
+
+    private static bool IsValidBlobContainerName(string name)
+    {
+        if (name.Length is < 3 or > 63)
+        {
+            return false;
+        }
+
+        if (!char.IsLetterOrDigit(name[0]) || !char.IsLetterOrDigit(name[^1]))
+        {
+            return false;
+        }
+
+        var prevHyphen = false;
+        foreach (var c in name)
+        {
+            if (c == '-')
+            {
+                if (prevHyphen)
+                {
+                    return false;
+                }
+
+                prevHyphen = true;
+            }
+            else if (char.IsLower(c) || char.IsDigit(c))
+            {
+                prevHyphen = false;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsValidTableName(string tableName)
@@ -95,4 +138,9 @@ public sealed class ScheduledSocialPostTableStorageOptions
     public string AccountEndpoint { get; init; } = string.Empty;
     public string TableName { get; init; } = "scheduledsocialposts";
     public string PartitionKey { get; init; } = "scheduled-social-post";
+}
+
+public sealed class ScheduledSocialPostBlobStorageOptions
+{
+    public string ContainerName { get; init; } = "scheduled-post-images";
 }

@@ -11,7 +11,8 @@ public sealed class SocialPostService(
     IImageResizer imageResizer,
     IHashtagService hashtagService,
     ILogger<SocialPostService> logger,
-    IScheduledSocialPostRepository? scheduledSocialPostRepository = null)
+    IScheduledSocialPostRepository? scheduledSocialPostRepository = null,
+    IScheduledPostImageStore? scheduledPostImageStore = null)
 {
     private readonly IReadOnlyDictionary<string, ISocialPlatformClient> _clients =
         platformClients.ToDictionary(c => c.PlatformName, StringComparer.OrdinalIgnoreCase);
@@ -21,6 +22,7 @@ public sealed class SocialPostService(
     private readonly IHashtagService _hashtagService = hashtagService;
     private readonly ILogger<SocialPostService> _logger = logger;
     private readonly IScheduledSocialPostRepository? _scheduledSocialPostRepository = scheduledSocialPostRepository;
+    private readonly IScheduledPostImageStore? _scheduledPostImageStore = scheduledPostImageStore;
 
     public async Task<string> ScheduleAsync(
         SocialPost post,
@@ -44,6 +46,27 @@ public sealed class SocialPostService(
         }
 
         var scheduledPostId = post.ScheduledPostId ?? Guid.NewGuid().ToString("N");
+
+        var uploadedImages = new List<StoredImageData>();
+        for (var i = 0; i < post.Images.Count; i++)
+        {
+            var image = post.Images[i];
+            if (_scheduledPostImageStore is null)
+            {
+                throw new InvalidOperationException("Scheduled post image store is not configured but images were provided.");
+            }
+
+            var blobName = await _scheduledPostImageStore.UploadAsync(
+                scheduledPostId, i, image.Content, image.ContentType, cancellationToken);
+            uploadedImages.Add(new StoredImageData
+            {
+                BlobName = blobName,
+                ContentType = image.ContentType,
+                AltText = image.AltText,
+                FileName = image.FileName
+            });
+        }
+
         var record = new ScheduledSocialPostRecord
         {
             ScheduledPostId = scheduledPostId,
@@ -53,13 +76,7 @@ public sealed class SocialPostService(
             Hashtags = post.Hashtags,
             TargetPlatforms = post.TargetPlatforms,
             ImageUrls = post.ImageUrls,
-            UploadedImages = post.Images.Select(image => new StoredImageData
-            {
-                ContentBase64 = Convert.ToBase64String(image.Content),
-                ContentType = image.ContentType,
-                AltText = image.AltText,
-                FileName = image.FileName
-            }).ToList(),
+            UploadedImages = uploadedImages,
             CreatedAtUtc = now,
             LastAttemptedAtUtc = null,
             PublishedAtUtc = null,

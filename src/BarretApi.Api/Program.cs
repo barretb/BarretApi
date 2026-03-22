@@ -113,6 +113,7 @@ builder.Services.AddSingleton<IImageDownloadService>(sp =>
     sp.GetRequiredService<ImageDownloadService>());
 builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPromotionRepository>();
 builder.Services.AddSingleton<IScheduledSocialPostRepository, AzureTableScheduledSocialPostRepository>();
+builder.Services.AddSingleton<IScheduledPostImageStore, AzureBlobScheduledPostImageStore>();
 builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
 builder.Services.AddSingleton<IScheduledSocialPostProcessor, ScheduledSocialPostProcessor>();
 builder.Services.AddSingleton<SocialPostService>();
