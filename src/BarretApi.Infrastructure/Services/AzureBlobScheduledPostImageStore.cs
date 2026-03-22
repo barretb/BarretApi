@@ -28,8 +28,9 @@ public sealed class AzureBlobScheduledPostImageStore : IScheduledPostImageStore
 		}
 		else
 		{
-			var blobEndpoint = DeriveBlobEndpoint(opts.TableStorage.AccountEndpoint);
-			_containerClient = new BlobContainerClient(blobEndpoint, new DefaultAzureCredential());
+			var blobServiceEndpoint = DeriveBlobEndpoint(opts.TableStorage.AccountEndpoint);
+			var serviceClient = new BlobServiceClient(blobServiceEndpoint, new DefaultAzureCredential());
+			_containerClient = serviceClient.GetBlobContainerClient(containerName);
 		}
 	}
 
