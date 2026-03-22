@@ -1370,6 +1370,8 @@ Each feature uses its own table name (`linkedintokens`, `blogpostpromotions`, `s
 
 If scheduled-post requests fail with a table initialization error, verify `ScheduledSocialPost__TableStorage__TableName` is lowercase alphanumeric (example: `scheduledsocialposts`) and restart the app after updating app settings.
 
+Some production environments restrict table creation at runtime. In that case, pre-create the scheduled-post table and grant the app identity table data-plane permissions before calling scheduled endpoints.
+
 ### LinkedIn Rollout Checklist
 
 1. Add LinkedIn configuration values to deployment settings before enabling LinkedIn in client requests.
