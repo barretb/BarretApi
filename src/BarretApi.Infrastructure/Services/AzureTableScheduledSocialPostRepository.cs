@@ -17,6 +17,7 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
     private readonly ScheduledSocialPostOptions _options;
     private readonly ILogger<AzureTableScheduledSocialPostRepository> _logger;
     private readonly TableClient _tableClient;
+    private readonly string _tableName;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private bool _initialized;
 
@@ -27,18 +28,19 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
         _options = scheduledSocialPostOptions.Value;
         _logger = logger;
         _options.ThrowIfInvalid();
+        _tableName = _options.TableStorage.TableName.Trim().ToLowerInvariant();
 
         if (!string.IsNullOrWhiteSpace(_options.TableStorage.ConnectionString))
         {
             _tableClient = new TableClient(
                 _options.TableStorage.ConnectionString,
-                _options.TableStorage.TableName);
+                _tableName);
         }
         else
         {
             _tableClient = new TableClient(
                 new Uri(_options.TableStorage.AccountEndpoint),
-                _options.TableStorage.TableName,
+                _tableName,
                 new DefaultAzureCredential());
         }
     }
@@ -186,14 +188,14 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
             catch (RequestFailedException ex) when (ex.Status == 400)
             {
                 throw new InvalidOperationException(
-                    $"Failed to create or access Azure Table '{_options.TableStorage.TableName}'. Verify ScheduledSocialPost table configuration, especially the table name and storage account settings.",
+                    $"Failed to create or access Azure Table '{_tableName}'. Verify ScheduledSocialPost table configuration, especially the table name and storage account settings.",
                     ex);
             }
 
             _initialized = true;
             _logger.LogInformation(
                 "Ensured Azure Table {TableName} exists at {AccountEndpoint}",
-                _options.TableStorage.TableName,
+                _tableName,
                 _options.TableStorage.AccountEndpoint);
         }
         finally
