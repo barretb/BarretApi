@@ -20,6 +20,7 @@ var blogPromotionTableStoragePartitionKey = builder.AddParameter("blog-promotion
 var scheduledSocialPostMaxBatchSize = builder.AddParameter("scheduled-social-post-max-batch-size");
 var scheduledSocialPostTableStorageTableName = builder.AddParameter("scheduled-social-post-table-storage-table-name");
 var scheduledSocialPostTableStoragePartitionKey = builder.AddParameter("scheduled-social-post-table-storage-partition-key");
+var scheduledSocialPostBlobStorageContainerName = builder.AddParameter("scheduled-social-post-blob-storage-container-name");
 var nasaApodApiKey = builder.AddParameter("nasa-apod-api-key", secret: true);
 var gibsBaseUrl = builder.AddParameter("gibs-base-url");
 var gibsDefaultLayer = builder.AddParameter("gibs-default-layer");
@@ -65,6 +66,7 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("ScheduledSocialPost__TableStorage__ConnectionString", azuriteConnectionString)
     .WithEnvironment("ScheduledSocialPost__TableStorage__TableName", scheduledSocialPostTableStorageTableName)
     .WithEnvironment("ScheduledSocialPost__TableStorage__PartitionKey", scheduledSocialPostTableStoragePartitionKey)
+    .WithEnvironment("ScheduledSocialPost__BlobStorage__ContainerName", scheduledSocialPostBlobStorageContainerName)
     .WithEnvironment("NasaApod__ApiKey", nasaApodApiKey)
     .WithEnvironment("NasaGibs__BaseUrl", gibsBaseUrl)
     .WithEnvironment("NasaGibs__DefaultLayer", gibsDefaultLayer)

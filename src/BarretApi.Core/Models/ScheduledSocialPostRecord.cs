@@ -23,7 +23,7 @@ public sealed class ScheduledSocialPostRecord
 
 public sealed class StoredImageData
 {
-    public required string ContentBase64 { get; init; }
+    public required string BlobName { get; init; }
     public required string ContentType { get; init; }
     public required string AltText { get; init; }
     public string? FileName { get; init; }

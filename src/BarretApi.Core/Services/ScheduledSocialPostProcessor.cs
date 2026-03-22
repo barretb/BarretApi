@@ -9,12 +9,14 @@ namespace BarretApi.Core.Services;
 public sealed class ScheduledSocialPostProcessor(
     IScheduledSocialPostRepository scheduledSocialPostRepository,
     SocialPostService socialPostService,
+    IScheduledPostImageStore scheduledPostImageStore,
     IOptions<ScheduledSocialPostOptions> options,
     ILogger<ScheduledSocialPostProcessor> logger)
     : IScheduledSocialPostProcessor
 {
     private readonly IScheduledSocialPostRepository _scheduledSocialPostRepository = scheduledSocialPostRepository;
     private readonly SocialPostService _socialPostService = socialPostService;
+    private readonly IScheduledPostImageStore _scheduledPostImageStore = scheduledPostImageStore;
     private readonly ScheduledSocialPostOptions _options = options.Value;
     private readonly ILogger<ScheduledSocialPostProcessor> _logger = logger;
 
@@ -52,7 +54,7 @@ public sealed class ScheduledSocialPostProcessor(
 
             attemptedCount++;
 
-            var post = MapToSocialPost(dueRecord);
+            var post = await MapToSocialPostAsync(dueRecord, cancellationToken);
             var results = await _socialPostService.PostAsync(post, cancellationToken);
 
             if (results.Count > 0 && results.All(r => r.Success))
@@ -119,23 +121,28 @@ public sealed class ScheduledSocialPostProcessor(
         return summary;
     }
 
-    private static SocialPost MapToSocialPost(ScheduledSocialPostRecord record)
+    private async Task<SocialPost> MapToSocialPostAsync(ScheduledSocialPostRecord record, CancellationToken cancellationToken)
     {
+        var images = new List<ImageData>();
+        foreach (var storedImage in record.UploadedImages)
+        {
+            var content = await _scheduledPostImageStore.DownloadAsync(storedImage.BlobName, cancellationToken);
+            images.Add(new ImageData
+            {
+                Content = content,
+                ContentType = storedImage.ContentType,
+                AltText = storedImage.AltText,
+                FileName = storedImage.FileName
+            });
+        }
+
         return new SocialPost
         {
             Text = record.Text,
             Hashtags = record.Hashtags,
             TargetPlatforms = record.TargetPlatforms,
             ImageUrls = record.ImageUrls,
-            Images = record.UploadedImages
-                .Select(i => new ImageData
-                {
-                    Content = Convert.FromBase64String(i.ContentBase64),
-                    ContentType = i.ContentType,
-                    AltText = i.AltText,
-                    FileName = i.FileName
-                })
-                .ToList()
+            Images = images
         };
     }
 }
