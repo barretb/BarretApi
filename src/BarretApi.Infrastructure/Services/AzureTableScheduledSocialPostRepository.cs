@@ -134,8 +134,8 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
         var entity = response.Value;
         entity["Status"] = ScheduledPostStatus.Published.ToString();
         entity["PublishedAtUtc"] = publishedAtUtc;
-        entity["LastErrorCode"] = null;
-        entity["LastErrorMessage"] = null;
+        entity.Remove("LastErrorCode");
+        entity.Remove("LastErrorMessage");
 
         await _tableClient.UpdateEntityAsync(entity, entity.ETag, TableUpdateMode.Replace, cancellationToken);
     }
@@ -179,7 +179,17 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
                 return;
             }
 
-            await _tableClient.CreateIfNotExistsAsync(cancellationToken);
+            try
+            {
+                await _tableClient.CreateIfNotExistsAsync(cancellationToken);
+            }
+            catch (RequestFailedException ex) when (ex.Status == 400)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to create or access Azure Table '{_options.TableStorage.TableName}'. Verify ScheduledSocialPost table configuration, especially the table name and storage account settings.",
+                    ex);
+            }
+
             _initialized = true;
             _logger.LogInformation(
                 "Ensured Azure Table {TableName} exists at {AccountEndpoint}",
@@ -226,16 +236,6 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
         if (!string.IsNullOrWhiteSpace(record.LastErrorMessage))
         {
             entity["LastErrorMessage"] = record.LastErrorMessage;
-        };
-
-        if (record.LastAttemptedAtUtc.HasValue)
-        {
-            entity["LastAttemptedAtUtc"] = record.LastAttemptedAtUtc.Value;
-        }
-
-        if (record.PublishedAtUtc.HasValue)
-        {
-            entity["PublishedAtUtc"] = record.PublishedAtUtc.Value;
         }
 
         return entity;
@@ -259,8 +259,8 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
             CreatedAtUtc = entity.GetDateTimeOffset("CreatedAtUtc") ?? DateTimeOffset.MinValue,
             LastAttemptedAtUtc = entity.GetDateTimeOffset("LastAttemptedAtUtc"),
             PublishedAtUtc = entity.GetDateTimeOffset("PublishedAtUtc"),
-                LastErrorCode = entity.GetString("LastErrorCode"),
-                LastErrorMessage = entity.GetString("LastErrorMessage"),
+            LastErrorCode = entity.GetString("LastErrorCode"),
+            LastErrorMessage = entity.GetString("LastErrorMessage"),
             AttemptCount = entity.GetInt32("AttemptCount") ?? 0
         };
     }
