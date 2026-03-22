@@ -143,6 +143,33 @@ POST /api/social-posts
 }
 ```
 
+#### Example — Schedule a Post for Later
+
+```http
+POST /api/social-posts
+```
+
+```json
+{
+  "text": "Launching the release announcement tomorrow morning.",
+  "hashtags": ["release", "dotnet"],
+  "platforms": ["linkedin", "bluesky"],
+  "scheduledFor": "2026-03-23T14:30:00Z"
+}
+```
+
+#### Response — 200 OK (Scheduled)
+
+```json
+{
+  "results": [],
+  "postedAt": null,
+  "scheduled": true,
+  "scheduledPostId": "sp_01HZYD3M5Q9K6Q",
+  "scheduledFor": "2026-03-23T14:30:00+00:00"
+}
+```
+
 #### Response — 200 OK (All Platforms Succeeded)
 
 ```json
@@ -281,6 +308,21 @@ Content-Type: multipart/form-data
 | `platforms` | `bluesky`, `linkedin` |
 | `images` | `before.jpg`, `after.jpg` |
 | `altTexts` | `Before the refactor`, `After the refactor` |
+
+#### Example — Schedule an Upload Post for Later
+
+```http
+POST /api/social-posts/upload
+Content-Type: multipart/form-data
+```
+
+| Field | Value |
+|---|---|
+| `text` | `Scheduled image post for tomorrow` |
+| `platforms` | `bluesky`, `mastodon` |
+| `scheduledFor` | `2026-03-23T16:00:00Z` |
+| `images` | `launch-banner.png` |
+| `altTexts` | `Launch banner showing feature highlights` |
 
 #### Response
 
