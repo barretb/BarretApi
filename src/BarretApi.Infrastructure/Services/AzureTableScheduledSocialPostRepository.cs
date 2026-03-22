@@ -206,8 +206,8 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
             ["UploadedImages"] = JsonSerializer.Serialize(record.UploadedImages, JsonOptions),
             ["CreatedAtUtc"] = record.CreatedAtUtc,
             ["AttemptCount"] = record.AttemptCount,
-            ["LastErrorCode"] = record.LastErrorCode,
-            ["LastErrorMessage"] = record.LastErrorMessage
+            ["LastErrorCode"] = record.LastErrorCode ?? string.Empty,
+            ["LastErrorMessage"] = record.LastErrorMessage ?? string.Empty
         };
 
         if (record.LastAttemptedAtUtc.HasValue)
@@ -241,8 +241,8 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
             CreatedAtUtc = entity.GetDateTimeOffset("CreatedAtUtc") ?? DateTimeOffset.MinValue,
             LastAttemptedAtUtc = entity.GetDateTimeOffset("LastAttemptedAtUtc"),
             PublishedAtUtc = entity.GetDateTimeOffset("PublishedAtUtc"),
-            LastErrorCode = entity.GetString("LastErrorCode"),
-            LastErrorMessage = entity.GetString("LastErrorMessage"),
+            LastErrorCode = NullIfEmpty(entity.GetString("LastErrorCode")),
+            LastErrorMessage = NullIfEmpty(entity.GetString("LastErrorMessage")),
             AttemptCount = entity.GetInt32("AttemptCount") ?? 0
         };
     }
@@ -256,6 +256,11 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
 
         var value = JsonSerializer.Deserialize<List<T>>(serialized, JsonOptions);
         return value ?? [];
+    }
+
+    private static string? NullIfEmpty(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     private static ScheduledPostStatus ParseStatus(string? value)
