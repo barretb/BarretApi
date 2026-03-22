@@ -43,12 +43,40 @@ public sealed class ScheduledSocialPostOptions
             return "ScheduledSocialPost:TableStorage:TableName is required.";
         }
 
+        if (!IsValidTableName(TableStorage.TableName))
+        {
+            return "ScheduledSocialPost:TableStorage:TableName must be a valid Azure Table name (3-63 characters, start with a letter, letters and numbers only).";
+        }
+
         if (string.IsNullOrWhiteSpace(TableStorage.PartitionKey))
         {
             return "ScheduledSocialPost:TableStorage:PartitionKey is required.";
         }
 
         return null;
+    }
+
+    private static bool IsValidTableName(string tableName)
+    {
+        if (tableName.Length is < 3 or > 63)
+        {
+            return false;
+        }
+
+        if (!char.IsLetter(tableName[0]))
+        {
+            return false;
+        }
+
+        foreach (var character in tableName)
+        {
+            if (!char.IsLetterOrDigit(character))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public void ThrowIfInvalid()
