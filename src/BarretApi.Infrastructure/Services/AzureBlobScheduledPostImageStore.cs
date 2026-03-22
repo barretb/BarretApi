@@ -22,14 +22,13 @@ public sealed class AzureBlobScheduledPostImageStore : IScheduledPostImageStore
 		var opts = options.Value;
 		var containerName = opts.BlobStorage.ContainerName;
 
-		if (!string.IsNullOrWhiteSpace(opts.TableStorage.ConnectionString))
+		if (!string.IsNullOrWhiteSpace(opts.BlobStorage.ConnectionString))
 		{
-			_containerClient = new BlobContainerClient(opts.TableStorage.ConnectionString, containerName);
+			_containerClient = new BlobContainerClient(opts.BlobStorage.ConnectionString, containerName);
 		}
 		else
 		{
-			var blobServiceEndpoint = DeriveBlobEndpoint(opts.TableStorage.AccountEndpoint);
-			var serviceClient = new BlobServiceClient(blobServiceEndpoint, new DefaultAzureCredential());
+			var serviceClient = new BlobServiceClient(new Uri(opts.BlobStorage.AccountEndpoint), new DefaultAzureCredential());
 			_containerClient = serviceClient.GetBlobContainerClient(containerName);
 		}
 	}
@@ -85,12 +84,4 @@ public sealed class AzureBlobScheduledPostImageStore : IScheduledPostImageStore
 		}
 	}
 
-	private static Uri DeriveBlobEndpoint(string tableEndpoint)
-	{
-		var blobUrl = tableEndpoint.Replace(
-			".table.core.windows.net",
-			".blob.core.windows.net",
-			StringComparison.OrdinalIgnoreCase);
-		return new Uri(blobUrl);
-	}
 }

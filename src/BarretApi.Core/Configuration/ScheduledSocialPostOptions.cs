@@ -54,6 +54,23 @@ public sealed class ScheduledSocialPostOptions
             return "ScheduledSocialPost:TableStorage:PartitionKey is required.";
         }
 
+        if (!string.IsNullOrWhiteSpace(BlobStorage.AccountEndpoint))
+        {
+            if (!Uri.TryCreate(BlobStorage.AccountEndpoint, UriKind.Absolute, out var blobEndpointUri))
+            {
+                return "ScheduledSocialPost:BlobStorage:AccountEndpoint must be a valid absolute URL if provided.";
+            }
+
+            if (blobEndpointUri.Scheme is not "https")
+            {
+                return "ScheduledSocialPost:BlobStorage:AccountEndpoint must use https.";
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(BlobStorage.ConnectionString))
+        {
+            return "ScheduledSocialPost:BlobStorage:ConnectionString or AccountEndpoint must be configured.";
+        }
+
         if (!IsValidBlobContainerName(BlobStorage.ContainerName))
         {
             return "ScheduledSocialPost:BlobStorage:ContainerName must be a valid Azure Blob container name (3-63 lowercase characters, letters, numbers, and hyphens only, starting and ending with a letter or number).";
@@ -142,5 +159,7 @@ public sealed class ScheduledSocialPostTableStorageOptions
 
 public sealed class ScheduledSocialPostBlobStorageOptions
 {
+    public string? ConnectionString { get; init; }
+    public string AccountEndpoint { get; init; } = string.Empty;
     public string ContainerName { get; init; } = "scheduled-post-images";
 }
