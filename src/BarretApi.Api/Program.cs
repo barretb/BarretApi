@@ -148,6 +148,7 @@ builder.Services.AddHttpClient<DiceBearAvatarClient>(client =>
 });
 builder.Services.AddSingleton<IDiceBearAvatarClient>(sp =>
     sp.GetRequiredService<DiceBearAvatarClient>());
+builder.Services.AddSingleton<AvatarPostService>();
 
 builder.Services.AddHttpClient<AngleSharpHtmlTextExtractor>();
 builder.Services.AddSingleton<IHtmlTextExtractor>(sp =>

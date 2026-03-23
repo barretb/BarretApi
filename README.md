@@ -20,6 +20,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
   - [POST /api/word-cloud — Generate Word Cloud](#post-apiword-cloud--generate-word-cloud)
   - [GET /api/avatars/random — Generate Random Avatar](#get-apiavatarsrandom--generate-random-avatar)
+  - [POST /api/social-posts/avatar — Post Random Avatar to Social Platforms](#post-apisocial-postsavatar--post-random-avatar-to-social-platforms)
 - [Configuration](#configuration)
 - [Production Notes](#production-notes)
 
@@ -1236,6 +1237,103 @@ Binary image data with the appropriate `Content-Type` header:
 | **400** | Invalid style, format, or seed (exceeds 256 chars). |
 | **401** | Missing or invalid `X-Api-Key`. |
 | **502** | DiceBear API is unreachable or returned an error. |
+
+---
+
+### POST /api/social-posts/avatar — Post Random Avatar to Social Platforms
+
+Generates a random DiceBear avatar (PNG format) and posts it to selected social media platforms. The avatar image is always generated in PNG format for maximum platform compatibility.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Method** | `POST` |
+| **Content-Type** | `application/json` |
+
+#### Request Body
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `style` | `string` | No | Random | DiceBear style (e.g., `pixel-art`, `adventurer`, `bottts`). |
+| `seed` | `string` | No | Random GUID | Seed for reproducible avatars. Max 256 characters. |
+| `text` | `string` | No | `""` | Post text. Max 10,000 characters. |
+| `altText` | `string` | No | `"A randomly generated DiceBear avatar"` | Alt text for the image. Max 1,500 characters. |
+| `hashtags` | `string[]` | No | `[]` | Hashtags to append. No spaces, max 100 chars each. |
+| `platforms` | `string[]` | No | All configured | Target platforms: `bluesky`, `mastodon`, `linkedin`. |
+
+#### Example — Post Avatar to All Platforms
+
+```bash
+curl -X POST http://localhost:5000/api/social-posts/avatar \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "style": "pixel-art",
+    "text": "Check out this random avatar!",
+    "hashtags": ["avatar", "dicebear"],
+    "platforms": ["bluesky", "mastodon"]
+  }'
+```
+
+#### Example — Minimal Request (Random Style, All Platforms)
+
+```bash
+curl -X POST http://localhost:5000/api/social-posts/avatar \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+#### Response — 200 OK (All Platforms Succeeded)
+
+```json
+{
+  "style": "pixel-art",
+  "seed": "a1b2c3d4",
+  "format": "png",
+  "imageAttached": true,
+  "results": [
+    {
+      "platform": "bluesky",
+      "success": true,
+      "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+      "postUrl": "https://bsky.app/profile/your-handle.bsky.social/post/xyz789",
+      "shortenedText": "Check out this random avatar! #avatar #dicebear"
+    },
+    {
+      "platform": "mastodon",
+      "success": true,
+      "postId": "109876543210",
+      "postUrl": "https://mastodon.social/@you/109876543210",
+      "shortenedText": "Check out this random avatar! #avatar #dicebear"
+    }
+  ],
+  "postedAt": "2026-03-22T12:00:00Z"
+}
+```
+
+#### Response — 207 (Partial Success)
+
+Some platforms succeeded, some failed. Each result includes individual status.
+
+#### Response — 502 (All Platforms Failed or Avatar Generation Failed)
+
+```json
+{
+  "statusCode": 502,
+  "message": "Failed to generate avatar: The avatar generation service is temporarily unavailable."
+}
+```
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **200** | All targeted platforms posted successfully. |
+| **207** | At least one platform succeeded and at least one failed. |
+| **400** | Invalid style, seed, text, alt text, platforms, or hashtags. |
+| **401** | Missing or invalid `X-Api-Key`. |
+| **502** | All platforms failed or the DiceBear API is unreachable. |
 
 ---
 
