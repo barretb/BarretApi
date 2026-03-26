@@ -7,6 +7,7 @@ namespace BarretApi.Core.Services;
 public sealed class SocialPostService(
     IEnumerable<ISocialPlatformClient> platformClients,
     ITextShorteningService textShorteningService,
+    ITextSplitterService textSplitterService,
     IImageDownloadService imageDownloadService,
     IImageResizer imageResizer,
     IHashtagService hashtagService,
@@ -17,6 +18,7 @@ public sealed class SocialPostService(
     private readonly IReadOnlyDictionary<string, ISocialPlatformClient> _clients =
         platformClients.ToDictionary(c => c.PlatformName, StringComparer.OrdinalIgnoreCase);
     private readonly ITextShorteningService _textShorteningService = textShorteningService;
+    private readonly ITextSplitterService _textSplitterService = textSplitterService;
     private readonly IImageDownloadService _imageDownloadService = imageDownloadService;
     private readonly IImageResizer _imageResizer = imageResizer;
     private readonly IHashtagService _hashtagService = hashtagService;
@@ -95,6 +97,121 @@ public sealed class SocialPostService(
         return scheduledPostId;
     }
 
+    public async Task<IReadOnlyList<PlatformPostResult>> PreviewAsync(
+        SocialPost post,
+        CancellationToken cancellationToken = default)
+    {
+        var targetPlatforms = ResolveTargetPlatforms(post.TargetPlatforms);
+        var hashtagResult = _hashtagService.ProcessHashtags(post.Text, post.Hashtags);
+        var textWithHashtags = hashtagResult.FinalText;
+
+        var tasks = targetPlatforms.Select(async client =>
+        {
+            var config = await client.GetConfigurationAsync(cancellationToken);
+            var processedText = _textShorteningService.Shorten(textWithHashtags, config.MaxCharacters);
+            return new PlatformPostResult
+            {
+                Platform = client.PlatformName,
+                Success = true,
+                PublishedText = processedText
+            };
+        });
+
+        return await Task.WhenAll(tasks);
+    }
+
+    public async Task<IReadOnlyList<ThreadPostingResult>> PostThreadAsync(
+        SocialThread thread,
+        CancellationToken cancellationToken = default)
+    {
+        var correlationId = Guid.NewGuid().ToString("N");
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["CorrelationId"] = correlationId
+        });
+
+        var targetPlatforms = ResolveTargetPlatforms(thread.TargetPlatforms);
+
+        _logger.LogInformation(
+            "Posting thread ({SegmentCount} segments) to {PlatformCount} platform(s): {Platforms}",
+            thread.Segments.Count,
+            targetPlatforms.Count,
+            string.Join(", ", targetPlatforms.Select(c => c.PlatformName)));
+
+        var tasks = targetPlatforms.Select(client =>
+            PostThreadToPlatformAsync(client, thread, cancellationToken));
+
+        return await Task.WhenAll(tasks);
+    }
+
+    private async Task<ThreadPostingResult> PostThreadToPlatformAsync(
+        ISocialPlatformClient client,
+        SocialThread thread,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var config = await client.GetConfigurationAsync(cancellationToken);
+            var segmentPosts = new List<ThreadSegmentPost>();
+
+            foreach (var segment in thread.Segments)
+            {
+                var hashtagResult = _hashtagService.ProcessHashtags(segment.Text, segment.Hashtags);
+                var textWithHashtags = hashtagResult.FinalText;
+                var shortenedText = _textShorteningService.Shorten(textWithHashtags, config.MaxCharacters);
+
+                var allImages = new List<ImageData>(segment.Images);
+                foreach (var imageUrl in segment.ImageUrls)
+                {
+                    var imageData = await _imageDownloadService.DownloadAsync(
+                        imageUrl.Url, imageUrl.AltText, cancellationToken);
+                    allImages.Add(imageData);
+                }
+
+                var uploadedImages = new List<UploadedImage>();
+                foreach (var imageData in allImages)
+                {
+                    var prepared = PrepareImageForPlatform(imageData, config);
+                    var uploaded = await client.UploadImageAsync(prepared, cancellationToken);
+                    uploadedImages.Add(uploaded);
+                }
+
+                segmentPosts.Add(new ThreadSegmentPost
+                {
+                    Text = shortenedText,
+                    Images = uploadedImages
+                });
+            }
+
+            var segmentResults = await client.PostThreadAsync(segmentPosts, cancellationToken);
+            var allSucceeded = segmentResults.All(r => r.Success);
+
+            _logger.LogInformation(
+                "Thread posted to {Platform}: {SuccessCount}/{TotalCount} segment(s) succeeded",
+                client.PlatformName,
+                segmentResults.Count(r => r.Success),
+                segmentResults.Count);
+
+            return new ThreadPostingResult
+            {
+                Platform = client.PlatformName,
+                Success = allSucceeded,
+                SegmentResults = segmentResults
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error posting thread to {Platform}", client.PlatformName);
+            return new ThreadPostingResult
+            {
+                Platform = client.PlatformName,
+                Success = false,
+                ErrorMessage = ex.Message,
+                ErrorCode = "UNKNOWN_ERROR"
+            };
+        }
+    }
+
     public async Task<IReadOnlyList<PlatformPostResult>> PostAsync(
         SocialPost post,
         CancellationToken cancellationToken = default)
@@ -142,7 +259,7 @@ public sealed class SocialPostService(
             allImages.Count);
 
         var tasks = targetPlatforms.Select(client =>
-            PostToPlatformAsync(client, textWithHashtags, allImages, cancellationToken));
+            PostToPlatformAsync(client, textWithHashtags, allImages, post.AutoThread, cancellationToken));
 
         var results = await Task.WhenAll(tasks);
 
@@ -203,6 +320,7 @@ public sealed class SocialPostService(
         ISocialPlatformClient client,
         string originalText,
         IReadOnlyList<ImageData> images,
+        bool autoThread,
         CancellationToken cancellationToken)
     {
         try
@@ -210,6 +328,14 @@ public sealed class SocialPostService(
             _logger.LogInformation("Posting to {Platform}", client.PlatformName);
 
             var config = await client.GetConfigurationAsync(cancellationToken);
+
+            // When auto-threading is requested and the text exceeds the platform limit,
+            // split into segments and post as a thread instead of truncating.
+            if (autoThread && new System.Globalization.StringInfo(originalText).LengthInTextElements > config.MaxCharacters)
+            {
+                return await PostAsAutoThreadAsync(client, originalText, images, config, cancellationToken);
+            }
+
             var textToPost = _textShorteningService.Shorten(originalText, config.MaxCharacters);
 
             if (textToPost != originalText)
@@ -285,6 +411,74 @@ public sealed class SocialPostService(
                 Error = ex
             };
         }
+    }
+
+    private async Task<PlatformPostResult> PostAsAutoThreadAsync(
+        ISocialPlatformClient client,
+        string text,
+        IReadOnlyList<ImageData> images,
+        PlatformConfiguration config,
+        CancellationToken cancellationToken)
+    {
+        var segments = _textSplitterService.Split(text, config.MaxCharacters);
+
+        _logger.LogInformation(
+            "Auto-threading {SegmentCount} segments for {Platform} (limit: {Limit})",
+            segments.Count,
+            client.PlatformName,
+            config.MaxCharacters);
+
+        // Upload images (attached to the first segment only)
+        var uploadedImages = new List<UploadedImage>();
+        try
+        {
+            foreach (var imageData in images)
+            {
+                var prepared = PrepareImageForPlatform(imageData, config);
+                var uploaded = await client.UploadImageAsync(prepared, cancellationToken);
+                uploadedImages.Add(uploaded);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload image to {Platform} during auto-thread", client.PlatformName);
+            return new PlatformPostResult
+            {
+                Platform = client.PlatformName,
+                Success = false,
+                ErrorMessage = $"Image upload failed: {ex.Message}",
+                ErrorCode = "IMAGE_UPLOAD_FAILED",
+                Error = ex
+            };
+        }
+
+        var segmentPosts = segments.Select((t, i) => new ThreadSegmentPost
+        {
+            Text = t,
+            Images = i == 0 ? uploadedImages : []
+        }).ToList();
+
+        var threadResults = await client.PostThreadAsync(segmentPosts, cancellationToken);
+        var allSucceeded = threadResults.All(r => r.Success);
+        var root = threadResults.FirstOrDefault();
+
+        _logger.LogInformation(
+            "Auto-thread posted to {Platform}: {SuccessCount}/{TotalCount} segment(s) succeeded",
+            client.PlatformName,
+            threadResults.Count(r => r.Success),
+            threadResults.Count);
+
+        return new PlatformPostResult
+        {
+            Platform = client.PlatformName,
+            Success = allSucceeded,
+            PostId = root?.PostId,
+            PostUrl = root?.PostUrl,
+            PublishedText = root?.PublishedText,
+            ErrorMessage = allSucceeded ? null : threadResults.FirstOrDefault(r => !r.Success)?.ErrorMessage,
+            ErrorCode = allSucceeded ? null : threadResults.FirstOrDefault(r => !r.Success)?.ErrorCode,
+            ThreadResults = threadResults
+        };
     }
 
     private ImageData PrepareImageForPlatform(ImageData image, PlatformConfiguration config)

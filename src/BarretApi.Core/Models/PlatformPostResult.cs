@@ -10,4 +10,10 @@ public sealed record PlatformPostResult
     public string? ErrorMessage { get; init; }
     public string? ErrorCode { get; init; }
     public Exception? Error { get; init; }
+
+    /// <summary>
+    /// Populated when a post was automatically split into a thread.
+    /// Each element corresponds to one segment of the thread.
+    /// </summary>
+    public IReadOnlyList<PlatformPostResult>? ThreadResults { get; init; }
 }

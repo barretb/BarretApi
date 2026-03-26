@@ -7,6 +7,8 @@ public sealed class CreateSocialPostRequest
     public List<string>? Hashtags { get; init; }
     public List<string>? Platforms { get; init; }
     public List<ImageAttachmentRequest>? Images { get; init; }
+    public bool DryRun { get; init; }
+    public bool AutoThread { get; init; }
 }
 
 public sealed class ImageAttachmentRequest

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -1 /c/projects/BarretApi/src/BarretApi.Api/Features/**/*Endpoint.cs)",
+      "Bash(git -C /c/projects/BarretApi log --oneline -20)",
+      "Bash(dotnet build:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"c:/projects/BarretApi/fix-tests.ps1\")"
+    ]
+  }
+}

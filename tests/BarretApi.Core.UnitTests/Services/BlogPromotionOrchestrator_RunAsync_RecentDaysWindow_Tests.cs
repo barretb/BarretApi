@@ -50,6 +50,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_RecentDaysWindow_Tests
         var socialPostService = new SocialPostService(
             [platformClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             Substitute.For<IImageResizer>(),
             hashtagService,

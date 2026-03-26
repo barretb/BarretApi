@@ -53,6 +53,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_ReminderFeedUrl_Tests
 		var socialPostService = new SocialPostService(
 			[_platformClient],
 			textShorteningService,
+			Substitute.For<ITextSplitterService>(),
 			imageDownloadService,
 			Substitute.For<IImageResizer>(),
 			hashtagService,

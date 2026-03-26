@@ -9,6 +9,7 @@ public sealed class SocialPost
     public IReadOnlyList<ImageData> Images { get; init; } = [];
     public IReadOnlyList<ImageUrl> ImageUrls { get; init; } = [];
     public IReadOnlyList<string> TargetPlatforms { get; init; } = [];
+    public bool AutoThread { get; init; }
 }
 
 /// <summary>

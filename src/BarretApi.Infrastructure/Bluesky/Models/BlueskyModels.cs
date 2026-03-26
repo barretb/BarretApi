@@ -47,6 +47,28 @@ internal sealed class BlueskyPostRecord
     [JsonPropertyName("embed")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public object? Embed { get; init; }
+
+    [JsonPropertyName("reply")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BlueskyReplyRef? Reply { get; init; }
+}
+
+internal sealed class BlueskyReplyRef
+{
+    [JsonPropertyName("root")]
+    public required BlueskyPostRef Root { get; init; }
+
+    [JsonPropertyName("parent")]
+    public required BlueskyPostRef Parent { get; init; }
+}
+
+internal sealed class BlueskyPostRef
+{
+    [JsonPropertyName("uri")]
+    public required string Uri { get; init; }
+
+    [JsonPropertyName("cid")]
+    public required string Cid { get; init; }
 }
 
 internal sealed class BlueskyFacet

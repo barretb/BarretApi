@@ -76,6 +76,7 @@ public sealed class RssRandomPostService_SelectAndPostAsync_Tests
         _socialPostService = new SocialPostService(
             [_mockClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             Substitute.For<IImageResizer>(),
             hashtagService,
@@ -238,6 +239,7 @@ public sealed class RssRandomPostService_PlatformTargeting_Tests
         var socialPostService = new SocialPostService(
             [_blueskyClient, _mastodonClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             Substitute.For<IImageResizer>(),
             hashtagService,
@@ -356,6 +358,7 @@ public sealed class RssRandomPostService_TagExclusion_Tests
         var socialPostService = new SocialPostService(
             [mockClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             Substitute.For<IImageResizer>(),
             _hashtagService,
@@ -663,6 +666,7 @@ public sealed class RssRandomPostService_RecencyFiltering_Tests
         var socialPostService = new SocialPostService(
             [mockClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             Substitute.For<IImageResizer>(),
             hashtagService,
@@ -846,6 +850,7 @@ public sealed class RssRandomPostService_HeaderPrepend_Tests
         var socialPostService = new SocialPostService(
             [_mockClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             Substitute.For<IImageResizer>(),
             hashtagService,

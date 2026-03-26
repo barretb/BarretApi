@@ -133,6 +133,14 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
     {
         var socialPost = MapToSocialPost(req);
 
+        if (req.DryRun)
+        {
+            var previewResults = await postService.PreviewAsync(socialPost, ct);
+            var previewResponse = BuildImmediateResponse(previewResults, dryRun: true);
+            await Send.ResponseAsync(previewResponse, 200, ct);
+            return;
+        }
+
         if (socialPost.ScheduledForUtc.HasValue)
         {
             var scheduledPostId = await postService.ScheduleAsync(socialPost, ct);
@@ -158,6 +166,7 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
             ScheduledForUtc = req.ScheduledFor?.ToUniversalTime(),
             TargetPlatforms = req.Platforms ?? [],
             Hashtags = req.Hashtags ?? [],
+            AutoThread = req.AutoThread,
             ImageUrls = req.Images?.Select(i => new Core.Models.ImageUrl
             {
                 Url = i.Url,
@@ -166,7 +175,9 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
         };
     }
 
-    private static CreateSocialPostResponse BuildImmediateResponse(IReadOnlyList<Core.Models.PlatformPostResult> results)
+    private static CreateSocialPostResponse BuildImmediateResponse(
+        IReadOnlyList<Core.Models.PlatformPostResult> results,
+        bool dryRun = false)
     {
         return new CreateSocialPostResponse
         {
@@ -178,10 +189,21 @@ public sealed class CreateSocialPostEndpoint(SocialPostService postService)
                 PostUrl = r.PostUrl,
                 ShortenedText = r.PublishedText,
                 Error = r.Success ? null : r.ErrorMessage,
-                ErrorCode = r.Success ? null : r.ErrorCode
+                ErrorCode = r.Success ? null : r.ErrorCode,
+                Threaded = r.ThreadResults is not null,
+                ThreadedPosts = r.ThreadResults?.Select(t => new ThreadedPostResult
+                {
+                    Success = t.Success,
+                    PostId = t.PostId,
+                    PostUrl = t.PostUrl,
+                    PublishedText = t.PublishedText,
+                    Error = t.Success ? null : t.ErrorMessage,
+                    ErrorCode = t.Success ? null : t.ErrorCode
+                }).ToList()
             }).ToList(),
-            PostedAt = DateTimeOffset.UtcNow,
-            Scheduled = false
+            PostedAt = dryRun ? null : DateTimeOffset.UtcNow,
+            Scheduled = false,
+            DryRun = dryRun
         };
     }
 

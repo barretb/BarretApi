@@ -108,6 +108,7 @@ builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
 builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
     sp.GetRequiredService<LinkedInClient>());
 builder.Services.AddSingleton<ITextShorteningService, TextShorteningService>();
+builder.Services.AddSingleton<ITextSplitterService, TextSplitterService>();
 builder.Services.AddSingleton<IHashtagService, HashtagService>();
 builder.Services.AddSingleton<IImageDownloadService>(sp =>
     sp.GetRequiredService<ImageDownloadService>());
