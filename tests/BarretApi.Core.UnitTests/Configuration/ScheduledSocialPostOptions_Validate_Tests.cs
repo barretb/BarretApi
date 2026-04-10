@@ -5,54 +5,54 @@ namespace BarretApi.Core.UnitTests.Configuration;
 
 public sealed class ScheduledSocialPostOptions_Validate_Tests
 {
-	[Fact]
-	public void ReturnsError_GivenInvalidTableName()
-	{
-		var options = new ScheduledSocialPostOptions
-		{
-			TableStorage = new ScheduledSocialPostTableStorageOptions
-			{
-				ConnectionString = "UseDevelopmentStorage=true",
-				TableName = "scheduled-social-post",
-				PartitionKey = "scheduled-social-post"
-			},
-			BlobStorage = new ScheduledSocialPostBlobStorageOptions
-			{
-				ConnectionString = "UseDevelopmentStorage=true"
-			},
-			MaxBatchSize = 100
-		};
+    [Fact]
+    public void ReturnsError_GivenInvalidTableName()
+    {
+        var options = new ScheduledSocialPostOptions
+        {
+            TableStorage = new ScheduledSocialPostTableStorageOptions
+            {
+                ConnectionString = "UseDevelopmentStorage=true",
+                TableName = "scheduled-social-post",
+                PartitionKey = "scheduled-social-post"
+            },
+            BlobStorage = new ScheduledSocialPostBlobStorageOptions
+            {
+                ConnectionString = "UseDevelopmentStorage=true"
+            },
+            MaxBatchSize = 100
+        };
 
-		var result = options.Validate();
+        var result = options.Validate();
 
-		result.ShouldBe("ScheduledSocialPost:TableStorage:TableName must be a valid Azure Table name (3-63 characters, start with a letter, letters and numbers only).");
-	}
+        result.ShouldBe("ScheduledSocialPost:TableStorage:TableName must be a valid Azure Table name (3-63 characters, start with a letter, letters and numbers only).");
+    }
 
-	[Fact]
-	public void ReturnsNull_GivenValidConnectionStringAndTableName()
-	{
-		var options = CreateOptions();
+    [Fact]
+    public void ReturnsNull_GivenValidConnectionStringAndTableName()
+    {
+        var options = CreateOptions();
 
-		var result = options.Validate();
+        var result = options.Validate();
 
-		result.ShouldBeNull();
-	}
+        result.ShouldBeNull();
+    }
 
-	private static ScheduledSocialPostOptions CreateOptions()
-	{
-		return new ScheduledSocialPostOptions
-		{
-			TableStorage = new ScheduledSocialPostTableStorageOptions
-			{
-				ConnectionString = "UseDevelopmentStorage=true",
-				TableName = "scheduledsocialposts",
-				PartitionKey = "scheduled-social-post"
-			},
-			BlobStorage = new ScheduledSocialPostBlobStorageOptions
-			{
-				ConnectionString = "UseDevelopmentStorage=true"
-			},
-			MaxBatchSize = 100
-		};
-	}
+    private static ScheduledSocialPostOptions CreateOptions()
+    {
+        return new ScheduledSocialPostOptions
+        {
+            TableStorage = new ScheduledSocialPostTableStorageOptions
+            {
+                ConnectionString = "UseDevelopmentStorage=true",
+                TableName = "scheduledsocialposts",
+                PartitionKey = "scheduled-social-post"
+            },
+            BlobStorage = new ScheduledSocialPostBlobStorageOptions
+            {
+                ConnectionString = "UseDevelopmentStorage=true"
+            },
+            MaxBatchSize = 100
+        };
+    }
 }

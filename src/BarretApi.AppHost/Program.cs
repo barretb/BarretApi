@@ -21,6 +21,12 @@ var scheduledSocialPostMaxBatchSize = builder.AddParameter("scheduled-social-pos
 var scheduledSocialPostTableStorageTableName = builder.AddParameter("scheduled-social-post-table-storage-table-name");
 var scheduledSocialPostTableStoragePartitionKey = builder.AddParameter("scheduled-social-post-table-storage-partition-key");
 var scheduledSocialPostBlobStorageContainerName = builder.AddParameter("scheduled-social-post-blob-storage-container-name");
+var gitHubClientId = builder.AddParameter("github-client-id", secret: true);
+var gitHubClientSecret = builder.AddParameter("github-client-secret", secret: true);
+var gitHubApiBaseUrl = builder.AddParameter("github-api-base-url");
+var gitHubOAuthBaseUrl = builder.AddParameter("github-oauth-base-url");
+var gitHubTokenStorageTableName = builder.AddParameter("github-token-storage-table-name");
+var gitHubRepoStorageTableName = builder.AddParameter("github-repo-storage-table-name");
 var nasaApodApiKey = builder.AddParameter("nasa-apod-api-key", secret: true);
 var gibsBaseUrl = builder.AddParameter("gibs-base-url");
 var gibsDefaultLayer = builder.AddParameter("gibs-default-layer");
@@ -76,6 +82,14 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("NasaGibs__BboxNorth", gibsBboxNorth)
     .WithEnvironment("NasaGibs__BboxEast", gibsBboxEast)
     .WithEnvironment("NasaGibs__ImageWidth", gibsImageWidth)
-    .WithEnvironment("NasaGibs__ImageHeight", gibsImageHeight);
+    .WithEnvironment("NasaGibs__ImageHeight", gibsImageHeight)
+    .WithEnvironment("GitHub__ClientId", gitHubClientId)
+    .WithEnvironment("GitHub__ClientSecret", gitHubClientSecret)
+    .WithEnvironment("GitHub__ApiBaseUrl", gitHubApiBaseUrl)
+    .WithEnvironment("GitHub__OAuthBaseUrl", gitHubOAuthBaseUrl)
+    .WithEnvironment("GitHub__TokenStorage__ConnectionString", azuriteConnectionString)
+    .WithEnvironment("GitHub__TokenStorage__TableName", gitHubTokenStorageTableName)
+    .WithEnvironment("GitHub__RepoStorage__ConnectionString", azuriteConnectionString)
+    .WithEnvironment("GitHub__RepoStorage__TableName", gitHubRepoStorageTableName);
 
 builder.Build().Run();

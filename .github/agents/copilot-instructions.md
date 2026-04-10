@@ -23,6 +23,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-28
 - Azure Table Storage for scheduled-post durable state (new table/entity set), using existing infrastructure persistence approach (001-social-post-scheduling)
 - C# / .NET 10.0 (`net10.0`) + FastEndpoints 8.x, Aspire 13, Azure.Data.Tables, Microsoft.Extensions.Http.Resilience (008-github-rest-api)
 - Azure Table Storage (via Aspire-provisioned Azurite in development) — for OAuth tokens and repository snapshots (008-github-rest-api)
+- C# latest, .NET 10.0 (`net10.0`) + SkiaSharp 3.119.2, FastEndpoints 8.1.0, FluentValidation (via FastEndpoints) (009-hero-image-generator)
+- N/A (stateless — no data persistence) (009-hero-image-generator)
 
 - C# / .NET 10.0 (`net10.0`), latest language features, nullable reference types enabled + FastEndpoints 7.x, Aspire 13 (AppHost + ServiceDefaults), FluentValidation, Microsoft.Extensions.Http (for HttpClientFactory with Polly retry) (001-social-post-api)
 
@@ -43,9 +45,9 @@ tests/
 C# / .NET 10.0 (`net10.0`), latest language features, nullable reference types enabled: Follow standard conventions
 
 ## Recent Changes
+- 009-hero-image-generator: Added C# latest, .NET 10.0 (`net10.0`) + SkiaSharp 3.119.2, FastEndpoints 8.1.0, FluentValidation (via FastEndpoints)
 - 008-github-rest-api: Added C# / .NET 10.0 (`net10.0`) + FastEndpoints 8.x, Aspire 13, Azure.Data.Tables, Microsoft.Extensions.Http.Resilience
 - 001-social-post-scheduling: Added C# / .NET 10.0 (`net10.0`) + FastEndpoints, FluentValidation, Microsoft.Extensions.Logging, existing social platform clients (Bluesky, Mastodon, LinkedIn), Azure.Data.Tables (existing persistence pattern)
-- 007-dicebear-avatar: Added C# / .NET 10.0 (`net10.0`) + FastEndpoints 8.x, Aspire 13, Microsoft.Extensions.Http.Resilience
 
 
 <!-- MANUAL ADDITIONS START -->

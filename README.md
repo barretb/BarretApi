@@ -1,6 +1,6 @@
 # BarretApi
 
-A cross-platform social-media posting API built with .NET 10, Aspire, and FastEndpoints. Publish to **Bluesky**, **Mastodon**, and **LinkedIn** from a single request, and automate blog promotion from an RSS feed.
+A cross-platform social-media posting API built with .NET 10, Aspire, and FastEndpoints. Publish to **Bluesky**, **Mastodon**, and **LinkedIn** from a single request, with automatic threading for long posts and automated blog promotion from an RSS feed.
 
 ## Table of Contents
 
@@ -20,6 +20,13 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
   - [POST /api/word-cloud — Generate Word Cloud](#post-apiword-cloud--generate-word-cloud)
   - [GET /api/avatars/random — Generate Random Avatar](#get-apiavatarsrandom--generate-random-avatar)
+  - [GET /api/github/auth — Initiate GitHub OAuth Flow](#get-apigithubauth--initiate-github-oauth-flow)
+  - [GET /api/github/auth/callback — GitHub OAuth Callback](#get-apigithubauthcallback--github-oauth-callback)
+  - [GET /api/github/profile — Get GitHub Profile](#get-apigithubprofile--get-github-profile)
+  - [POST /api/github/repos/sync — Sync GitHub Repositories](#post-apigithubrepos-sync--sync-github-repositories)
+  - [GET /api/github/repos — List GitHub Repositories](#get-apigithubrepos--list-github-repositories)
+  - [GET /api/github/repos/{name} — Get Repository Details](#get-apigithubreposname--get-repository-details)
+  - [POST /api/github/repos/{name}/issues — Create GitHub Issue](#post-apigithubreposnameissues--create-github-issue)
 - [Configuration](#configuration)
 - [Production Notes](#production-notes)
 
@@ -71,6 +78,8 @@ All mutating endpoints require an API key passed via the `X-Api-Key` header. The
 
 The LinkedIn OAuth endpoints (`/api/linkedin/auth`, `/api/linkedin/auth/callback`, `/api/linkedin/profile`) are **anonymous** — they do not require an API key.
 
+The GitHub OAuth endpoints (`/api/github/auth`, `/api/github/auth/callback`, `/api/github/profile`) are also **anonymous** — they do not require an API key. All other GitHub endpoints require the `X-Api-Key` header.
+
 ## API Endpoints
 
 ---
@@ -92,6 +101,7 @@ Creates a cross-platform social post. Images are supplied as URL references and 
 | `hashtags` | `string[]` | No | Hashtags to append (no spaces, max 100 chars each). |
 | `platforms` | `string[]` | No | Target platforms: `bluesky`, `mastodon`, `linkedin`. |
 | `scheduledFor` | `string` (ISO 8601) | No | Future UTC datetime for deferred posting. When set, request is queued and not published immediately. |
+| `autoThread` | `boolean` | No | When `true`, text exceeding the platform character limit is automatically split into a reply-chain thread. Defaults to `false`. |
 | `images` | `object[]` | No | Up to 4 image references. |
 | `images[].url` | `string` | Yes | Absolute URL of the image. |
 | `images[].altText` | `string` | Yes | Alt text for the image (max 1,500 chars). |
@@ -143,6 +153,20 @@ POST /api/social-posts
 }
 ```
 
+#### Example — Auto-Thread a Long Post
+
+```http
+POST /api/social-posts
+```
+
+```json
+{
+  "text": "This is a very long post that exceeds the platform character limit. When autoThread is enabled, the text is automatically split into multiple segments and posted as a reply chain. Each segment breaks at paragraph or word boundaries for readability.",
+  "platforms": ["bluesky", "mastodon"],
+  "autoThread": true
+}
+```
+
 #### Example — Schedule a Post for Later
 
 ```http
@@ -167,6 +191,40 @@ POST /api/social-posts
   "scheduled": true,
   "scheduledPostId": "sp_01HZYD3M5Q9K6Q",
   "scheduledFor": "2026-03-23T14:30:00+00:00"
+}
+```
+
+#### Response — 200 OK (Threaded Post)
+
+When `autoThread` is `true` and the text exceeds the platform limit, the response includes per-segment details:
+
+```json
+{
+  "results": [
+    {
+      "platform": "bluesky",
+      "success": true,
+      "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+      "postUrl": "https://bsky.app/profile/handle/post/xyz789",
+      "shortenedText": "First segment content",
+      "threaded": true,
+      "threadedPosts": [
+        {
+          "success": true,
+          "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+          "postUrl": "https://bsky.app/profile/handle/post/xyz789",
+          "publishedText": "First segment"
+        },
+        {
+          "success": true,
+          "postId": "at://did:plc:abc123/app.bsky.feed.post/abc456",
+          "postUrl": "https://bsky.app/profile/handle/post/abc456",
+          "publishedText": "Second segment"
+        }
+      ]
+    }
+  ],
+  "postedAt": "2026-03-25T12:00:00+00:00"
 }
 ```
 
@@ -257,6 +315,23 @@ Returned when at least one platform succeeded and at least one failed.
 | **400** | Request validation failed. |
 | **401** | Missing or invalid `X-Api-Key`. |
 | **502** | All targeted platforms failed. |
+
+#### Auto-Threading Behavior
+
+When `autoThread` is `true`, text that exceeds a platform's character limit is split into multiple segments and posted as a reply chain. Text is split intelligently using grapheme cluster counting (correct for multi-byte Unicode) with the following break priority:
+
+1. Paragraph boundaries (`\n\n`)
+2. Line breaks (`\n`)
+3. Word boundaries
+4. Hard cut (last resort)
+
+Images are attached only to the **first segment** of a thread. If any segment fails to post, subsequent segments are marked with error code `THREAD_BROKEN`.
+
+| Platform | Thread Support | Character Limit | Chaining Mechanism |
+|---|---|---|---|
+| **Bluesky** | Yes | 300 grapheme clusters | Reply chain with root + parent references |
+| **Mastodon** | Yes | Instance-dependent (typically 500) | Sequential replies via `in_reply_to_id` |
+| **LinkedIn** | No native threading | 3,000 characters | Each segment posted independently |
 
 ---
 
@@ -1239,6 +1314,472 @@ Binary image data with the appropriate `Content-Type` header:
 
 ---
 
+### GET /api/github/auth — Initiate GitHub OAuth Flow
+
+Starts the GitHub OAuth authorization flow. Open this URL directly in a **browser** to be redirected to GitHub's consent screen. When called from a non-browser API client, returns a JSON object with the authorization URL.
+
+| Detail | Value |
+|---|---|
+| **Auth** | None (anonymous) |
+
+#### Example — Browser
+
+Navigate to:
+
+```
+https://<your-api-host>/api/github/auth
+```
+
+You will be redirected to GitHub to authorize the application.
+
+#### Example — API Client
+
+```http
+GET /api/github/auth
+Accept: application/json
+```
+
+#### Response — 200 OK (API Client)
+
+```json
+{
+  "authUrl": "https://github.com/login/oauth/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=https%3A%2F%2Fyour-api-host%2Fapi%2Fgithub%2Fauth%2Fcallback&scope=repo&state=abc123"
+}
+```
+
+---
+
+### GET /api/github/auth/callback — GitHub OAuth Callback
+
+Receives the authorization code from GitHub after the user approves access. Exchanges the code for an access token, retrieves the user profile, and persists the token to Azure Table Storage.
+
+| Detail | Value |
+|---|---|
+| **Auth** | None (anonymous) |
+
+This endpoint is called automatically by GitHub after authorization. You do not need to call it manually.
+
+#### Query Parameters
+
+| Parameter | Description |
+|---|---|
+| `code` | Authorization code from GitHub. |
+| `state` | State parameter for CSRF protection. |
+| `error` | Error code if authorization was denied. |
+| `error_description` | Human-readable error description. |
+
+#### Response — 200 OK
+
+```json
+{
+  "username": "octocat",
+  "status": "connected",
+  "scope": "repo"
+}
+```
+
+#### Response — 400 Bad Request
+
+```json
+{
+  "statusCode": 400,
+  "message": "GitHub authorization denied: access_denied"
+}
+```
+
+---
+
+### GET /api/github/profile — Get GitHub Profile
+
+Returns the currently connected GitHub user info, or indicates no connection exists.
+
+| Detail | Value |
+|---|---|
+| **Auth** | None (anonymous) |
+
+#### Example
+
+```http
+GET /api/github/profile
+```
+
+#### Response — 200 OK (Connected)
+
+```json
+{
+  "username": "octocat",
+  "connected": true,
+  "scope": "repo",
+  "connectedAtUtc": "2026-03-25T14:00:00Z"
+}
+```
+
+#### Response — 200 OK (Not Connected)
+
+```json
+{
+  "username": null,
+  "connected": false,
+  "scope": null,
+  "connectedAtUtc": null
+}
+```
+
+---
+
+### POST /api/github/repos/sync — Sync GitHub Repositories
+
+Fetches all repositories owned by the authenticated GitHub user and stores them locally, replacing any previously stored data.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+
+#### Example
+
+```http
+POST /api/github/repos/sync
+X-Api-Key: YOUR_API_KEY
+```
+
+#### Response — 200 OK
+
+```json
+{
+  "count": 42,
+  "syncedAtUtc": "2026-03-25T14:35:00Z",
+  "username": "octocat"
+}
+```
+
+#### Response — 401 Unauthorized
+
+```json
+{
+  "statusCode": 401,
+  "message": "GitHub authentication required. Visit /api/github/auth to connect."
+}
+```
+
+#### Response — 429 Too Many Requests
+
+```json
+{
+  "statusCode": 429,
+  "message": "GitHub API rate limit exceeded. Resets at 2026-03-25T15:00:00Z."
+}
+```
+
+#### Response — 502 Bad Gateway
+
+```json
+{
+  "statusCode": 502,
+  "message": "GitHub API error: 500 — Internal Server Error"
+}
+```
+
+---
+
+### GET /api/github/repos — List GitHub Repositories
+
+Returns all locally stored GitHub repositories.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+
+#### Example
+
+```http
+GET /api/github/repos
+X-Api-Key: YOUR_API_KEY
+```
+
+#### Response — 200 OK
+
+```json
+{
+  "repositories": [
+    {
+      "name": "my-repo",
+      "fullName": "octocat/my-repo",
+      "description": "A sample repository",
+      "isPrivate": false,
+      "defaultBranch": "main",
+      "htmlUrl": "https://github.com/octocat/my-repo",
+      "updatedAtUtc": "2026-03-20T10:00:00Z"
+    }
+  ],
+  "count": 1,
+  "syncedAtUtc": "2026-03-25T14:35:00Z"
+}
+```
+
+#### Response — 200 OK (No Repositories Synced)
+
+```json
+{
+  "repositories": [],
+  "count": 0,
+  "syncedAtUtc": null
+}
+```
+
+---
+
+### GET /api/github/repos/{name} — Get Repository Details
+
+Returns details for a single stored repository by name.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+
+#### Path Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes | Repository name (e.g., `my-repo`) |
+
+#### Example
+
+```http
+GET /api/github/repos/my-repo
+X-Api-Key: YOUR_API_KEY
+```
+
+#### Response — 200 OK
+
+```json
+{
+  "name": "my-repo",
+  "fullName": "octocat/my-repo",
+  "description": "A sample repository",
+  "isPrivate": false,
+  "defaultBranch": "main",
+  "htmlUrl": "https://github.com/octocat/my-repo",
+  "updatedAtUtc": "2026-03-20T10:00:00Z",
+  "syncedAtUtc": "2026-03-25T14:35:00Z"
+}
+```
+
+#### Response — 404 Not Found
+
+```json
+{
+  "statusCode": 404,
+  "message": "Repository 'unknown-repo' not found. Run POST /api/github/repos/sync to refresh."
+}
+```
+
+---
+
+### POST /api/github/repos/{name}/issues — Create GitHub Issue
+
+Creates a new issue on the specified GitHub repository.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+
+#### Path Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes | Repository name (e.g., `my-repo`) |
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | Yes | Issue title. |
+| `body` | `string` | No | Issue body (Markdown supported). |
+| `labels` | `string[]` | No | List of label names to apply. |
+
+#### Example — Minimal
+
+```http
+POST /api/github/repos/my-repo/issues
+X-Api-Key: YOUR_API_KEY
+Content-Type: application/json
+```
+
+```json
+{
+  "title": "Fix login page styling"
+}
+```
+
+#### Example — Full
+
+```http
+POST /api/github/repos/my-repo/issues
+X-Api-Key: YOUR_API_KEY
+Content-Type: application/json
+```
+
+```json
+{
+  "title": "Add dark mode support",
+  "body": "## Description\n\nUsers have requested a dark mode option.",
+  "labels": ["enhancement", "ui"]
+}
+```
+
+#### Response — 201 Created
+
+```json
+{
+  "number": 42,
+  "title": "Add dark mode support",
+  "htmlUrl": "https://github.com/octocat/my-repo/issues/42",
+  "state": "open"
+}
+```
+
+#### Response — 400 Bad Request
+
+```json
+{
+  "statusCode": 400,
+  "message": "One or more validation errors occurred.",
+  "errors": {
+    "title": ["'title' must not be empty."]
+  }
+}
+```
+
+#### Response — 404 Not Found
+
+```json
+{
+  "statusCode": 404,
+  "message": "Repository 'unknown-repo' not found. Run POST /api/github/repos/sync to refresh."
+}
+```
+
+#### Response — 401 Unauthorized
+
+```json
+{
+  "statusCode": 401,
+  "message": "GitHub authentication required. Visit /api/github/auth to connect."
+}
+```
+
+#### Response — 429 Too Many Requests
+
+```json
+{
+  "statusCode": 429,
+  "message": "GitHub API rate limit exceeded. Resets at 2026-03-25T15:00:00Z."
+}
+```
+
+#### Response — 502 Bad Gateway
+
+```json
+{
+  "statusCode": 502,
+  "message": "GitHub API error: 422 — Validation Failed (Issues are disabled for this repository)"
+}
+```
+
+---
+
+### POST /api/hero-image — Generate Hero Image
+
+Composites a 1280×720 PNG hero image with title (and optional subtitle) overlaid on a faded background, with the author's face in the lower-right and logo in the lower-left. Returns the PNG as binary image data.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `multipart/form-data` |
+| **Response** | `image/png` binary (1280×720) |
+
+#### Request Fields
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `title` | `string` | **Yes** | Non-empty, max 200 characters |
+| `subtitle` | `string` | No | Max 300 characters |
+| `backgroundImage` | `file` | No | JPEG or PNG, max 10 MB |
+
+#### Example — Title Only
+
+```http
+POST /api/hero-image
+X-Api-Key: YOUR_API_KEY
+Content-Type: multipart/form-data
+```
+
+```bash
+curl -X POST http://localhost:5000/api/hero-image \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -F "title=Getting Started with .NET 10" \
+  -o hero.png
+```
+
+#### Example — Title and Subtitle
+
+```bash
+curl -X POST http://localhost:5000/api/hero-image \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -F "title=Blazor Deep Dive" \
+  -F "subtitle=Part 3: Component Lifecycle" \
+  -o hero.png
+```
+
+#### Example — Custom Background
+
+```bash
+curl -X POST http://localhost:5000/api/hero-image \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -F "title=Azure Functions" \
+  -F "backgroundImage=@my-background.jpg" \
+  -o hero.png
+```
+
+#### Response — 200 OK
+
+Binary PNG image data (1280×720). Set the `Accept` header or rely on `Content-Type: image/png` to handle the binary response.
+
+#### Response — 400 Bad Request
+
+```json
+{
+  "statusCode": 400,
+  "message": "One or more validation errors occurred.",
+  "errors": {
+    "title": ["Title is required."]
+  }
+}
+```
+
+#### Response — 422 Unprocessable Entity
+
+Returned when a background image file is uploaded but cannot be decoded as a valid image.
+
+```json
+{
+  "statusCode": 422,
+  "message": "Failed to decode custom background image."
+}
+```
+
+#### Response — 500 Internal Server Error
+
+```json
+{
+  "statusCode": 500,
+  "message": "An unexpected error occurred during image generation."
+}
+```
+
+---
+
 ## Configuration
 
 All configuration is managed through the **Aspire AppHost** project. Do not add `appsettings.json` entries in other projects. Use **User Secrets** in the AppHost for sensitive values during development.
@@ -1281,6 +1822,19 @@ Settings shown with `—` for the Aspire parameter are hardcoded in the AppHost 
 | `LinkedIn:OAuthBaseUrl` | `linkedin-oauth-base-url` | `LinkedIn__OAuthBaseUrl` | No | Defaults to `https://www.linkedin.com`. |
 | `LinkedIn:TokenStorage:ConnectionString` | — | `LinkedIn__TokenStorage__ConnectionString` | No | Azure Table Storage connection string. Hardcoded to Azurite in AppHost. |
 | `LinkedIn:TokenStorage:TableName` | `linkedin-token-storage-table-name` | `LinkedIn__TokenStorage__TableName` | No | Defaults to `linkedintokens`. |
+
+#### GitHub
+
+| Config Key | Aspire Parameter | Environment Variable | Required | Description |
+|---|---|---|---|---|
+| `GitHub:ClientId` | `github-client-id` | `GitHub__ClientId` | Yes | GitHub OAuth application client ID. |
+| `GitHub:ClientSecret` | `github-client-secret` | `GitHub__ClientSecret` | Yes | GitHub OAuth application client secret. |
+| `GitHub:ApiBaseUrl` | `github-api-base-url` | `GitHub__ApiBaseUrl` | No | Defaults to `https://api.github.com`. |
+| `GitHub:OAuthBaseUrl` | `github-oauth-base-url` | `GitHub__OAuthBaseUrl` | No | Defaults to `https://github.com`. |
+| `GitHub:TokenStorage:ConnectionString` | — | `GitHub__TokenStorage__ConnectionString` | No | Azure Table Storage connection string. Hardcoded to Azurite in AppHost. |
+| `GitHub:TokenStorage:TableName` | `github-token-storage-table-name` | `GitHub__TokenStorage__TableName` | No | Defaults to `githubtokens`. |
+| `GitHub:RepoStorage:ConnectionString` | — | `GitHub__RepoStorage__ConnectionString` | No | Azure Table Storage connection string. Hardcoded to Azurite in AppHost. |
+| `GitHub:RepoStorage:TableName` | `github-repo-storage-table-name` | `GitHub__RepoStorage__TableName` | No | Defaults to `githubrepositories`. |
 
 ### API Authentication
 

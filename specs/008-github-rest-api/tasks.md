@@ -19,7 +19,7 @@
 
 **Purpose**: Aspire AppHost configuration for GitHub OAuth parameters and environment variables
 
-- [ ] T001 Configure Aspire AppHost with GitHub parameters and environment variables in src/BarretApi.AppHost/Program.cs
+- [X] T001 Configure Aspire AppHost with GitHub parameters and environment variables in src/BarretApi.AppHost/Program.cs
 
 > **T001 Details**: Add Aspire parameters for `github-client-id`, `github-client-secret`, `github-api-base-url`, `github-oauth-base-url`, `github-token-storage-account-endpoint`, `github-token-storage-table-name`, `github-repo-storage-account-endpoint`, `github-repo-storage-table-name`. Map to environment variables `GitHub__ClientId`, `GitHub__ClientSecret`, `GitHub__ApiBaseUrl`, `GitHub__OAuthBaseUrl`, `GitHub__TokenStorage__AccountEndpoint`, `GitHub__TokenStorage__TableName`, `GitHub__RepoStorage__AccountEndpoint`, `GitHub__RepoStorage__TableName`. Follow the existing LinkedIn parameter pattern. Add `github-client-id` and `github-client-secret` as required secret parameters. Set default values for optional parameters (ApiBaseUrl: `https://api.github.com`, OAuthBaseUrl: `https://github.com`, token table: `githubtokens`, repo table: `githubrepositories`). Wire ConnectionString environment variables from the Azurite storage resource.
 
@@ -31,47 +31,47 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T002 [P] Create GitHubOptions, GitHubTokenStorageOptions, and GitHubRepoStorageOptions configuration classes in src/BarretApi.Core/Configuration/GitHubOptions.cs
+- [X] T002 [P] Create GitHubOptions, GitHubTokenStorageOptions, and GitHubRepoStorageOptions configuration classes in src/BarretApi.Core/Configuration/GitHubOptions.cs
 
 > **T002 Details**: Strongly-typed configuration bound via `IOptions<GitHubOptions>`. Properties: `ClientId` (string, required), `ClientSecret` (string, required), `ApiBaseUrl` (string, default `https://api.github.com`), `OAuthBaseUrl` (string, default `https://github.com`), `TokenStorage` (GitHubTokenStorageOptions), `RepoStorage` (GitHubRepoStorageOptions). Nested classes have `ConnectionString`, `AccountEndpoint`, `TableName` (with defaults `githubtokens` / `githubrepositories`). Follow the existing LinkedIn options pattern. Use file-scoped namespace, sealed classes.
 
-- [ ] T003 [P] Create GitHubTokenRecord model in src/BarretApi.Core/Models/GitHubTokenRecord.cs
+- [X] T003 [P] Create GitHubTokenRecord model in src/BarretApi.Core/Models/GitHubTokenRecord.cs
 
 > **T003 Details**: Properties: `AccessToken` (string), `Username` (string), `Scope` (string), `UpdatedAtUtc` (DateTimeOffset). This is a POCO for cross-layer transfer. Does NOT inherit from `ITableEntity` — the Infrastructure layer handles table mapping. Sealed class, file-scoped namespace.
 
-- [ ] T004 [P] Create GitHubRepositoryRecord model in src/BarretApi.Core/Models/GitHubRepositoryRecord.cs
+- [X] T004 [P] Create GitHubRepositoryRecord model in src/BarretApi.Core/Models/GitHubRepositoryRecord.cs
 
 > **T004 Details**: Properties: `Name` (string), `FullName` (string), `Description` (string?), `IsPrivate` (bool), `DefaultBranch` (string), `HtmlUrl` (string), `UpdatedAtUtc` (DateTimeOffset), `SyncedAtUtc` (DateTimeOffset). Sealed class, file-scoped namespace.
 
-- [ ] T005 [P] Create GitHubIssueResult model in src/BarretApi.Core/Models/GitHubIssueResult.cs
+- [X] T005 [P] Create GitHubIssueResult model in src/BarretApi.Core/Models/GitHubIssueResult.cs
 
 > **T005 Details**: Properties: `Number` (int), `Title` (string), `HtmlUrl` (string), `State` (string). Transient result object — not persisted. Sealed class, file-scoped namespace.
 
-- [ ] T006 [P] Create IGitHubTokenStore interface in src/BarretApi.Core/Interfaces/IGitHubTokenStore.cs
+- [X] T006 [P] Create IGitHubTokenStore interface in src/BarretApi.Core/Interfaces/IGitHubTokenStore.cs
 
 > **T006 Details**: Methods: `Task<GitHubTokenRecord?> GetTokenAsync(CancellationToken)`, `Task SaveTokenAsync(GitHubTokenRecord, CancellationToken)`. Follow the existing `ILinkedInTokenStore` pattern. File-scoped namespace.
 
-- [ ] T007 [P] Create IGitHubRepositoryStore interface in src/BarretApi.Core/Interfaces/IGitHubRepositoryStore.cs
+- [X] T007 [P] Create IGitHubRepositoryStore interface in src/BarretApi.Core/Interfaces/IGitHubRepositoryStore.cs
 
 > **T007 Details**: Methods: `Task<IReadOnlyList<GitHubRepositoryRecord>> GetAllAsync(CancellationToken)`, `Task<GitHubRepositoryRecord?> GetByNameAsync(string name, CancellationToken)`, `Task ReplaceAllAsync(string username, IReadOnlyList<GitHubRepositoryRecord> repositories, CancellationToken)`. File-scoped namespace.
 
-- [ ] T008 [P] Create IGitHubClient interface in src/BarretApi.Core/Interfaces/IGitHubClient.cs
+- [X] T008 [P] Create IGitHubClient interface in src/BarretApi.Core/Interfaces/IGitHubClient.cs
 
 > **T008 Details**: Methods: `Task<GitHubTokenRecord> ExchangeCodeForTokenAsync(string code, CancellationToken)`, `Task<IReadOnlyList<GitHubRepositoryRecord>> GetRepositoriesAsync(CancellationToken)`, `Task<GitHubIssueResult> CreateIssueAsync(string owner, string repo, string title, string? body, IReadOnlyList<string>? labels, CancellationToken)`. File-scoped namespace.
 
-- [ ] T009 [P] Create GitHubApiModels for internal JSON deserialization in src/BarretApi.Infrastructure/GitHub/Models/GitHubApiModels.cs
+- [X] T009 [P] Create GitHubApiModels for internal JSON deserialization in src/BarretApi.Infrastructure/GitHub/Models/GitHubApiModels.cs
 
 > **T009 Details**: Internal record types for deserializing GitHub API JSON responses. Include: `GitHubTokenResponse` (access_token, token_type, scope), `GitHubUserResponse` (login), `GitHubRepoResponse` (name, full_name, description, private, default_branch, html_url, updated_at), `GitHubIssueResponse` (number, title, html_url, state). Use `System.Text.Json.Serialization.JsonPropertyName` attributes for snake_case mapping. Internal visibility — not exposed outside Infrastructure.
 
-- [ ] T010 Create GitHubTokenProvider in src/BarretApi.Infrastructure/GitHub/GitHubTokenProvider.cs
+- [X] T010 Create GitHubTokenProvider in src/BarretApi.Infrastructure/GitHub/GitHubTokenProvider.cs
 
 > **T010 Details**: Reads token from `IGitHubTokenStore` on first use, caches in memory. Method: `Task<string> GetAccessTokenAsync(CancellationToken)` — returns the access token string or throws if no token stored. No refresh logic needed (GitHub tokens don't expire). No `SemaphoreSlim` needed. If downstream gets 401, caller clears provider cache via `void ClearCache()`. Follow research.md decision §5. Sealed class, primary constructor with `IGitHubTokenStore` dependency.
 
-- [ ] T011 [P] Create GitHubOptions_Validate_Tests in tests/BarretApi.Core.UnitTests/Configuration/GitHubOptions_Validate_Tests.cs
+- [X] T011 [P] Create GitHubOptions_Validate_Tests in tests/BarretApi.Core.UnitTests/Configuration/GitHubOptions_Validate_Tests.cs
 
 > **T011 Details**: Test that GitHubOptions defaults are correct (ApiBaseUrl, OAuthBaseUrl, table names). Test that nested options have expected defaults. Use xUnit `[Fact]` and Shouldly assertions. Follow naming convention: `ReturnsCorrectDefaults_GivenNewInstance`, etc.
 
-- [ ] T012 [P] Create GitHubTokenProvider_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/GitHubTokenProvider_Tests.cs
+- [X] T012 [P] Create GitHubTokenProvider_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/GitHubTokenProvider_Tests.cs
 
 > **T012 Details**: Test token caching behavior: first call reads from store, second call returns cached. Test `GetAccessTokenAsync` throws when no token stored. Test `ClearCache` causes next call to re-read from store. Use NSubstitute for `IGitHubTokenStore`. Use xUnit + Shouldly. Follow naming: `ReturnsToken_GivenTokenInStore`, `ThrowsException_GivenNoTokenInStore`, `ReReadsFromStore_GivenCacheCleared`.
 
@@ -91,37 +91,37 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T013 [P] [US1] Create AzureTableGitHubTokenStore_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/AzureTableGitHubTokenStore_Tests.cs
+- [X] T013 [P] [US1] Create AzureTableGitHubTokenStore_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/AzureTableGitHubTokenStore_Tests.cs
 
 > **T013 Details**: Test `SaveTokenAsync` writes to Azure Table with correct partition key (`"github-tokens"`) and row key (`"current"`). Test `GetTokenAsync` returns stored token. Test `GetTokenAsync` returns null when no token exists. Use NSubstitute to mock `TableClient`. Use xUnit + Shouldly. Follow naming: `SavesToken_GivenValidTokenRecord`, `ReturnsToken_GivenTokenExists`, `ReturnsNull_GivenNoTokenExists`.
 
-- [ ] T014 [P] [US1] Create GitHubAuthCallbackEndpoint_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubAuthCallbackEndpoint_Tests.cs
+- [X] T014 [P] [US1] Create GitHubAuthCallbackEndpoint_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubAuthCallbackEndpoint_Tests.cs
 
 > **T014 Details**: Test successful callback exchanges code and stores token. Test callback with error parameter returns 400. Test callback with mismatched state returns 400. Use NSubstitute for `IGitHubClient` and `IGitHubTokenStore`. Use xUnit + Shouldly. Follow naming: `ReturnsConnectedStatus_GivenValidAuthCode`, `ReturnsBadRequest_GivenOAuthError`, `ReturnsBadRequest_GivenInvalidState`.
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Implement AzureTableGitHubTokenStore in src/BarretApi.Infrastructure/GitHub/AzureTableGitHubTokenStore.cs
+- [X] T015 [US1] Implement AzureTableGitHubTokenStore in src/BarretApi.Infrastructure/GitHub/AzureTableGitHubTokenStore.cs
 
 > **T015 Details**: Implements `IGitHubTokenStore`. Uses `TableClient` from Azure.Data.Tables. Partition key: `"github-tokens"`, row key: `"current"`. `SaveTokenAsync`: upserts a `TableEntity` with AccessToken, Username, Scope, UpdatedAtUtc properties. `GetTokenAsync`: gets entity, maps to `GitHubTokenRecord`, returns null if not found. Configure `TableClient` from `IOptions<GitHubOptions>` using TokenStorage settings. Create table if not exists. Sealed class, primary constructor. Follow existing `AzureTableLinkedInTokenStore` pattern.
 
-- [ ] T016 [US1] Implement GitHubClient with OAuth methods in src/BarretApi.Infrastructure/GitHub/GitHubClient.cs
+- [X] T016 [US1] Implement GitHubClient with OAuth methods in src/BarretApi.Infrastructure/GitHub/GitHubClient.cs
 
 > **T016 Details**: Implements `IGitHubClient` (partial — OAuth methods only in this task). Uses typed `HttpClient` injected via constructor. `ExchangeCodeForTokenAsync`: POST to `{OAuthBaseUrl}/login/oauth/access_token` with client_id, client_secret, code; set `Accept: application/json` header; deserialize `GitHubTokenResponse`; then GET `/user` with Bearer token to get username; return `GitHubTokenRecord` with access token, username, scope, current UTC timestamp. Add `X-GitHub-Api-Version: 2022-11-28` and `User-Agent` headers. Sealed class, primary constructor with `HttpClient`, `IOptions<GitHubOptions>`, `GitHubTokenProvider`, `ILogger<GitHubClient>`. Leave `GetRepositoriesAsync` and `CreateIssueAsync` as `throw new NotImplementedException()` stubs for now.
 
-- [ ] T017 [P] [US1] Create GitHubAuthEndpoint in src/BarretApi.Api/Features/GitHub/GitHubAuthEndpoint.cs
+- [X] T017 [P] [US1] Create GitHubAuthEndpoint in src/BarretApi.Api/Features/GitHub/GitHubAuthEndpoint.cs
 
 > **T017 Details**: GET `/api/github/auth`. Anonymous access (no API key). Generates a random state GUID, stores it (in-memory or cache for validation on callback). Builds GitHub authorization URL: `{OAuthBaseUrl}/login/oauth/authorize?client_id={clientId}&redirect_uri={callbackUrl}&scope=repo&state={state}`. Returns 200 with `{ "authUrl": "..." }` for API clients. Follow FastEndpoints REPR pattern with `EndpointWithoutRequest`. Use `IOptions<GitHubOptions>` for client ID and OAuth base URL.
 
-- [ ] T018 [US1] Create GitHubAuthCallbackEndpoint with request, response, and validator in src/BarretApi.Api/Features/GitHub/
+- [X] T018 [US1] Create GitHubAuthCallbackEndpoint with request, response, and validator in src/BarretApi.Api/Features/GitHub/
 
 > **T018 Details**: Create 4 files: `GitHubAuthCallbackRequest.cs` (properties: Code, State, Error, ErrorDescription — bound from query string), `GitHubAuthCallbackResponse.cs` (properties: Username, Status, Scope), `GitHubAuthCallbackValidator.cs` (validates State is required; Code required when Error is absent), `GitHubAuthCallbackEndpoint.cs` (GET `/api/github/auth/callback`, anonymous access). Endpoint logic: validate state matches stored state (FR-004); if error param present, return 400 with error message; exchange code via `IGitHubClient.ExchangeCodeForTokenAsync`; save token via `IGitHubTokenStore.SaveTokenAsync`; return 200 with username, "connected" status, scope. Handle exchange failures with 400/502 responses.
 
-- [ ] T019 [P] [US1] Create GitHubProfileEndpoint and response in src/BarretApi.Api/Features/GitHub/
+- [X] T019 [P] [US1] Create GitHubProfileEndpoint and response in src/BarretApi.Api/Features/GitHub/
 
 > **T019 Details**: Create 2 files: `GitHubProfileResponse.cs` (properties: Username, Connected (bool), Scope, ConnectedAtUtc), `GitHubProfileEndpoint.cs` (GET `/api/github/profile`, anonymous access). Reads stored token from `IGitHubTokenStore.GetTokenAsync`. If token exists, returns 200 with username, connected=true, scope, and UpdatedAtUtc. If no token, returns 200 with connected=false and null fields. Follow FastEndpoints REPR pattern.
 
-- [ ] T020 [US1] Register GitHub authentication services and configure HttpClient in src/BarretApi.Api/Program.cs
+- [X] T020 [US1] Register GitHub authentication services and configure HttpClient in src/BarretApi.Api/Program.cs
 
 > **T020 Details**: Bind `GitHubOptions` from configuration section `"GitHub"`. Register `IGitHubTokenStore` → `AzureTableGitHubTokenStore` (scoped). Register `GitHubTokenProvider` (singleton). Register `IGitHubClient` → `GitHubClient` as typed HttpClient via `AddHttpClient<IGitHubClient, GitHubClient>` with base address from `GitHubOptions.ApiBaseUrl` and resilience handler. Follow existing LinkedIn service registration pattern. Ensure HttpClient has default headers: `User-Agent: BarretApi`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`.
 
@@ -141,41 +141,41 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T021 [P] [US2] Create AzureTableGitHubRepositoryStore_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/AzureTableGitHubRepositoryStore_Tests.cs
+- [X] T021 [P] [US2] Create AzureTableGitHubRepositoryStore_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/AzureTableGitHubRepositoryStore_Tests.cs
 
 > **T021 Details**: Test `ReplaceAllAsync` deletes existing rows and inserts new ones. Test `GetAllAsync` returns all stored repositories. Test `GetByNameAsync` returns matching repo or null. Use NSubstitute to mock `TableClient`. Use xUnit + Shouldly. Follow naming: `ReplacesAllRepositories_GivenNewList`, `ReturnsAllRepositories_GivenRepositoriesExist`, `ReturnsNull_GivenRepositoryNotFound`.
 
-- [ ] T022 [P] [US2] Create GitHubClient_GetRepositoriesAsync_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/GitHubClient_GetRepositoriesAsync_Tests.cs
+- [X] T022 [P] [US2] Create GitHubClient_GetRepositoriesAsync_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/GitHubClient_GetRepositoriesAsync_Tests.cs
 
 > **T022 Details**: Test single page of repos returns correct list. Test pagination (multiple pages via Link header) aggregates all repos. Test 401 response throws appropriate exception. Test rate limit (429) returns error with reset time. Use NSubstitute with mock `HttpMessageHandler` or `MockHttpMessageHandler`. Use xUnit + Shouldly. Follow naming: `ReturnsRepositories_GivenSinglePage`, `ReturnsAllRepositories_GivenMultiplePages`, `ThrowsUnauthorized_GivenRevokedToken`.
 
-- [ ] T023 [P] [US2] Create GitHubRepoSyncEndpoint_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubRepoSyncEndpoint_Tests.cs
+- [X] T023 [P] [US2] Create GitHubRepoSyncEndpoint_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubRepoSyncEndpoint_Tests.cs
 
 > **T023 Details**: Test successful sync returns count and timestamp. Test sync without token returns 401. Test sync with GitHub API error returns 502. Use NSubstitute for `IGitHubClient`, `IGitHubRepositoryStore`, `IGitHubTokenStore`. Use xUnit + Shouldly. Follow naming: `ReturnsSyncCount_GivenSuccessfulSync`, `ReturnsUnauthorized_GivenNoToken`, `ReturnsBadGateway_GivenGitHubApiError`.
 
 ### Implementation for User Story 2
 
-- [ ] T024 [US2] Implement AzureTableGitHubRepositoryStore in src/BarretApi.Infrastructure/GitHub/AzureTableGitHubRepositoryStore.cs
+- [X] T024 [US2] Implement AzureTableGitHubRepositoryStore in src/BarretApi.Infrastructure/GitHub/AzureTableGitHubRepositoryStore.cs
 
 > **T024 Details**: Implements `IGitHubRepositoryStore`. Uses `TableClient` from Azure.Data.Tables. `GetAllAsync`: query all entities in the table, map to `GitHubRepositoryRecord` list. `GetByNameAsync`: query by partition key (username from stored token) and row key (repo name), return mapped record or null. `ReplaceAllAsync`: delete all existing entities for the username partition, then batch-insert new entities. Configure `TableClient` from `IOptions<GitHubOptions>` using RepoStorage settings. Create table if not exists. Sealed class, primary constructor.
 
-- [ ] T025 [US2] Add GetRepositoriesAsync with pagination to GitHubClient in src/BarretApi.Infrastructure/GitHub/GitHubClient.cs
+- [X] T025 [US2] Add GetRepositoriesAsync with pagination to GitHubClient in src/BarretApi.Infrastructure/GitHub/GitHubClient.cs
 
 > **T025 Details**: Replace the `NotImplementedException` stub. GET `/user/repos?type=owner&per_page=100&page={n}`. Use Bearer token from `GitHubTokenProvider.GetAccessTokenAsync`. Parse `Link` response header for `rel="next"` to handle pagination. Deserialize each page as `List<GitHubRepoResponse>`. Map to `GitHubRepositoryRecord` list with `SyncedAtUtc` set to current UTC. Handle 401 (clear token provider cache, throw), 429 (parse `X-RateLimit-Reset`, throw with reset time), other errors (throw with status code and message). Add structured logging for sync start, page fetched, sync complete.
 
-- [ ] T026 [US2] Create GitHubRepoSyncEndpoint and response in src/BarretApi.Api/Features/GitHub/
+- [X] T026 [US2] Create GitHubRepoSyncEndpoint and response in src/BarretApi.Api/Features/GitHub/
 
 > **T026 Details**: Create 2 files: `GitHubRepoSyncResponse.cs` (properties: Count (int), SyncedAtUtc (DateTimeOffset), Username (string)), `GitHubRepoSyncEndpoint.cs` (POST `/api/github/repos/sync`, requires API key auth). Endpoint logic: get token from store (return 401 if missing); call `IGitHubClient.GetRepositoriesAsync`; call `IGitHubRepositoryStore.ReplaceAllAsync` with username and results; return 200 with count, timestamp, username. Handle exceptions: token revoked → 401, rate limit → 429, GitHub API error → 502. Follow FastEndpoints REPR pattern.
 
-- [ ] T027 [P] [US2] Create GitHubRepoListEndpoint and response in src/BarretApi.Api/Features/GitHub/
+- [X] T027 [P] [US2] Create GitHubRepoListEndpoint and response in src/BarretApi.Api/Features/GitHub/
 
 > **T027 Details**: Create 2 files: `GitHubRepoListResponse.cs` (properties: Repositories (list of repo summary objects with Name, FullName, Description, IsPrivate, DefaultBranch, HtmlUrl, UpdatedAtUtc), Count (int), SyncedAtUtc (DateTimeOffset?)), `GitHubRepoListEndpoint.cs` (GET `/api/github/repos`, requires API key auth). Reads all repos from `IGitHubRepositoryStore.GetAllAsync`. Returns 200 with mapped list even if empty. Follow FastEndpoints REPR pattern.
 
-- [ ] T028 [P] [US2] Create GitHubRepoDetailEndpoint, request, and response in src/BarretApi.Api/Features/GitHub/
+- [X] T028 [P] [US2] Create GitHubRepoDetailEndpoint, request, and response in src/BarretApi.Api/Features/GitHub/
 
 > **T028 Details**: Create 3 files: `GitHubRepoDetailRequest.cs` (property: Name — bound from route parameter), `GitHubRepoDetailResponse.cs` (properties: Name, FullName, Description, IsPrivate, DefaultBranch, HtmlUrl, UpdatedAtUtc, SyncedAtUtc), `GitHubRepoDetailEndpoint.cs` (GET `/api/github/repos/{name}`, requires API key auth). Calls `IGitHubRepositoryStore.GetByNameAsync`. Returns 200 with repo details or 404 with message "Repository '{name}' not found. Run POST /api/github/repos/sync to refresh." Follow FastEndpoints REPR pattern.
 
-- [ ] T029 [US2] Register GitHub repository store service in src/BarretApi.Api/Program.cs
+- [X] T029 [US2] Register GitHub repository store service in src/BarretApi.Api/Program.cs
 
 > **T029 Details**: Add `IGitHubRepositoryStore` → `AzureTableGitHubRepositoryStore` (scoped) to the existing GitHub DI registrations added in T020.
 
@@ -195,25 +195,25 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T030 [P] [US3] Create GitHubClient_CreateIssueAsync_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/GitHubClient_CreateIssueAsync_Tests.cs
+- [X] T030 [P] [US3] Create GitHubClient_CreateIssueAsync_Tests in tests/BarretApi.Infrastructure.UnitTests/GitHub/GitHubClient_CreateIssueAsync_Tests.cs
 
 > **T030 Details**: Test successful issue creation returns correct result. Test with optional body and labels sends all fields. Test 401 response throws unauthorized. Test 422 response (e.g., issues disabled) throws with message. Use NSubstitute with mock `HttpMessageHandler`. Use xUnit + Shouldly. Follow naming: `ReturnsIssueResult_GivenValidRequest`, `SendsAllFields_GivenBodyAndLabels`, `ThrowsUnauthorized_GivenRevokedToken`, `ThrowsApiError_GivenValidationFailed`.
 
-- [ ] T031 [P] [US3] Create GitHubCreateIssueEndpoint_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubCreateIssueEndpoint_Tests.cs
+- [X] T031 [P] [US3] Create GitHubCreateIssueEndpoint_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubCreateIssueEndpoint_Tests.cs
 
 > **T031 Details**: Test successful creation returns 201 with issue details. Test repo not found in store returns 404. Test no token returns 401. Use NSubstitute for `IGitHubClient`, `IGitHubRepositoryStore`, `IGitHubTokenStore`. Use xUnit + Shouldly. Follow naming: `ReturnsCreated_GivenValidIssueRequest`, `ReturnsNotFound_GivenUnknownRepository`, `ReturnsUnauthorized_GivenNoToken`.
 
-- [ ] T032 [P] [US3] Create GitHubCreateIssueValidator_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubCreateIssueValidator_Tests.cs
+- [X] T032 [P] [US3] Create GitHubCreateIssueValidator_Tests in tests/BarretApi.Api.UnitTests/Features/GitHub/GitHubCreateIssueValidator_Tests.cs
 
 > **T032 Details**: Test title is required (empty/null fails). Test repo name is required (empty/null fails). Test valid request passes. Test optional body and labels are accepted. Use xUnit + Shouldly. Instantiate validator directly, call `ValidateAsync`. Follow naming: `FailsValidation_GivenEmptyTitle`, `FailsValidation_GivenEmptyRepoName`, `PassesValidation_GivenValidRequest`, `PassesValidation_GivenOptionalFields`.
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] Add CreateIssueAsync to GitHubClient in src/BarretApi.Infrastructure/GitHub/GitHubClient.cs
+- [X] T033 [US3] Add CreateIssueAsync to GitHubClient in src/BarretApi.Infrastructure/GitHub/GitHubClient.cs
 
 > **T033 Details**: Replace the `NotImplementedException` stub. POST `/repos/{owner}/{repo}/issues` with JSON body: `{ "title": "...", "body": "...", "labels": [...] }`. Use Bearer token from `GitHubTokenProvider.GetAccessTokenAsync`. Deserialize response as `GitHubIssueResponse`. Map to `GitHubIssueResult`. Handle 401 (clear cache, throw), 422 (throw with error details), 429 (rate limit), other errors. Add structured logging.
 
-- [ ] T034 [US3] Create GitHubCreateIssueEndpoint with request, response, and validator in src/BarretApi.Api/Features/GitHub/
+- [X] T034 [US3] Create GitHubCreateIssueEndpoint with request, response, and validator in src/BarretApi.Api/Features/GitHub/
 
 > **T034 Details**: Create 4 files: `GitHubCreateIssueRequest.cs` (properties: Name (from route), Title (string), Body (string?), Labels (List<string>?)), `GitHubCreateIssueResponse.cs` (properties: Number (int), Title (string), HtmlUrl (string), State (string)), `GitHubCreateIssueValidator.cs` (FluentValidation: Title not empty, Name not empty), `GitHubCreateIssueEndpoint.cs` (POST `/api/github/repos/{name}/issues`, requires API key auth). Endpoint logic: get token (401 if missing); lookup repo in store by name (404 if not found, per FR-017); call `IGitHubClient.CreateIssueAsync` with owner from repo's FullName, repo name, title, body, labels; return 201 with issue result. Handle exceptions: token revoked → 401, rate limit → 429, GitHub API error → 502.
 
@@ -225,9 +225,9 @@
 
 **Purpose**: Documentation, formatting, and end-to-end validation
 
-- [ ] T035 [P] Update README.md with GitHub REST API feature documentation
-- [ ] T036 [P] Run dotnet format and verify clean build with no warnings
-- [ ] T037 Validate quickstart.md scenarios end-to-end
+- [X] T035 [P] Update README.md with GitHub REST API feature documentation
+- [X] T036 [P] Run dotnet format and verify clean build with no warnings
+- [X] T037 Validate quickstart.md scenarios end-to-end
 
 > **T035 Details**: Add a "GitHub REST API Integration" section to README.md covering: feature description, 7 endpoints with methods/paths/auth requirements, configuration parameters table (Config Key / Aspire Parameter / Environment Variable / Required / Default / Description), example request/response for each endpoint. Follow existing README formatting conventions.
 
