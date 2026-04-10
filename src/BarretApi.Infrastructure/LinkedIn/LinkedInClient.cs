@@ -89,6 +89,20 @@ public sealed class LinkedInClient(
         };
     }
 
+    public async Task<IReadOnlyList<PlatformPostResult>> PostThreadAsync(
+        IReadOnlyList<ThreadSegmentPost> segments,
+        CancellationToken cancellationToken = default)
+    {
+        // LinkedIn does not support native reply threading; each segment is posted independently.
+        var results = new List<PlatformPostResult>();
+        foreach (var segment in segments)
+        {
+            var result = await PostAsync(segment.Text, segment.Images, cancellationToken);
+            results.Add(result);
+        }
+        return results;
+    }
+
     public Task<PlatformConfiguration> GetConfigurationAsync(
         CancellationToken cancellationToken = default)
     {

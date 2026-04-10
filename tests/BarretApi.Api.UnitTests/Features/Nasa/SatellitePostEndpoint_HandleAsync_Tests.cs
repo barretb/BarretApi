@@ -22,6 +22,7 @@ public sealed class SatellitePostEndpoint_HandleAsync_Tests
         var socialPostService = new SocialPostService(
             Array.Empty<ISocialPlatformClient>(),
             Substitute.For<ITextShorteningService>(),
+            Substitute.For<ITextSplitterService>(),
             Substitute.For<IImageDownloadService>(),
             Substitute.For<IImageResizer>(),
             Substitute.For<IHashtagService>(),

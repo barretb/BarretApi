@@ -2,9 +2,11 @@ using BarretApi.Api.Auth;
 using BarretApi.Api.Validation;
 using BarretApi.Core.Configuration;
 using BarretApi.Core.Interfaces;
+using BarretApi.Core.Models;
 using BarretApi.Core.Services;
 using BarretApi.Infrastructure.Bluesky;
 using BarretApi.Infrastructure.DiceBear;
+using BarretApi.Infrastructure.GitHub;
 using BarretApi.Infrastructure.LinkedIn;
 using BarretApi.Infrastructure.Mastodon;
 using BarretApi.Infrastructure.Nasa;
@@ -108,6 +110,7 @@ builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
 builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
     sp.GetRequiredService<LinkedInClient>());
 builder.Services.AddSingleton<ITextShorteningService, TextShorteningService>();
+builder.Services.AddSingleton<ITextSplitterService, TextSplitterService>();
 builder.Services.AddSingleton<IHashtagService, HashtagService>();
 builder.Services.AddSingleton<IImageDownloadService>(sp =>
     sp.GetRequiredService<ImageDownloadService>());
@@ -154,6 +157,29 @@ builder.Services.AddSingleton<IHtmlTextExtractor>(sp =>
     sp.GetRequiredService<AngleSharpHtmlTextExtractor>());
 builder.Services.AddSingleton<IWordCloudGenerator, SkiaWordCloudGenerator>();
 builder.Services.AddSingleton<TextAnalysisService>();
+
+builder.Services.Configure<GitHubOptions>(builder.Configuration.GetSection(GitHubOptions.SectionName));
+builder.Services.AddSingleton<IGitHubTokenStore, AzureTableGitHubTokenStore>();
+builder.Services.AddSingleton<IGitHubRepositoryStore, AzureTableGitHubRepositoryStore>();
+builder.Services.AddSingleton<GitHubTokenProvider>();
+builder.Services.AddHttpClient<IGitHubClient, GitHubClient>((sp, client) =>
+{
+    var gitHubOptions = builder.Configuration.GetSection(GitHubOptions.SectionName);
+    client.BaseAddress = new Uri(gitHubOptions["ApiBaseUrl"] ?? "https://api.github.com");
+    client.DefaultRequestHeaders.Add("User-Agent", "BarretApi");
+    client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+    client.DefaultRequestHeaders.Accept.Add(
+        new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+});
+
+builder.Services.Configure<HeroImageOptions>(o =>
+{
+    var contentRoot = builder.Environment.ContentRootPath;
+    o.FaceImagePath = Path.Combine(contentRoot, "images", "barretcircle2.png");
+    o.LogoImagePath = Path.Combine(contentRoot, "images", "barret-blake-logo-1024.png");
+    o.DefaultBackgroundPath = Path.Combine(contentRoot, "images", "generic-background.jpg");
+});
+builder.Services.AddScoped<IHeroImageGenerator, SkiaHeroImageGenerator>();
 
 var app = builder.Build();
 

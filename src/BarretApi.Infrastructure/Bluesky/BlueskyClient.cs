@@ -32,47 +32,8 @@ public sealed class BlueskyClient(
         try
         {
             var session = await EnsureAuthenticatedAsync(cancellationToken);
-
-            object? embed = BuildImageEmbed(images);
-            var facets = BlueskyFacetBuilder.BuildFacets(text);
-
-            var request = new BlueskyCreateRecordRequest
-            {
-                Repo = session.Did,
-                Collection = "app.bsky.feed.post",
-                Record = new BlueskyPostRecord
-                {
-                    Text = text,
-                    CreatedAt = DateTimeOffset.UtcNow.ToString("o"),
-                    Facets = facets,
-                    Embed = embed
-                }
-            };
-
-            SetAuthHeader(session.AccessJwt);
-            var response = await httpClient.PostAsJsonAsync(
-                "/xrpc/com.atproto.repo.createRecord",
-                request,
-                cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await ReadErrorAsync(response, cancellationToken);
-                return CreateFailureResult(error.errorMessage, error.errorCode);
-            }
-
-            var result = await response.Content.ReadFromJsonAsync<BlueskyCreateRecordResponse>(cancellationToken);
-
-            var postUrl = BuildPostUrl(session.Handle, result!.Uri);
-
-            return new PlatformPostResult
-            {
-                Platform = PlatformName,
-                Success = true,
-                PostId = result.Uri,
-                PostUrl = postUrl,
-                PublishedText = text
-            };
+            var (result, _) = await CreatePostRecordAsync(session, text, images, reply: null, cancellationToken);
+            return result;
         }
         catch (HttpRequestException ex)
         {
@@ -84,6 +45,114 @@ public sealed class BlueskyClient(
             logger.LogError(ex, "Bluesky API request timed out");
             return CreateFailureResult("Request timed out", "PLATFORM_ERROR", ex);
         }
+    }
+
+    public async Task<IReadOnlyList<PlatformPostResult>> PostThreadAsync(
+        IReadOnlyList<ThreadSegmentPost> segments,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var session = await EnsureAuthenticatedAsync(cancellationToken);
+            var results = new List<PlatformPostResult>();
+            BlueskyPostRef? rootRef = null;
+            BlueskyPostRef? parentRef = null;
+
+            foreach (var segment in segments)
+            {
+                BlueskyReplyRef? replyRef = rootRef is not null && parentRef is not null
+                    ? new BlueskyReplyRef { Root = rootRef, Parent = parentRef }
+                    : null;
+
+                var (postResult, raw) = await CreatePostRecordAsync(
+                    session, segment.Text, segment.Images, replyRef, cancellationToken);
+
+                results.Add(postResult);
+
+                if (!postResult.Success || raw is null)
+                {
+                    break;
+                }
+
+                var postRef = new BlueskyPostRef { Uri = raw.Uri, Cid = raw.Cid };
+                rootRef ??= postRef;
+                parentRef = postRef;
+            }
+
+            while (results.Count < segments.Count)
+            {
+                results.Add(new PlatformPostResult
+                {
+                    Platform = PlatformName,
+                    Success = false,
+                    ErrorMessage = "Previous segment failed",
+                    ErrorCode = "THREAD_BROKEN"
+                });
+            }
+
+            return results;
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Bluesky API request failed during thread posting");
+            return segments.Select(_ => CreateFailureResult(ex.Message, "PLATFORM_ERROR", ex)).ToList();
+        }
+        catch (TaskCanceledException ex)
+        {
+            logger.LogError(ex, "Bluesky API request timed out during thread posting");
+            return segments.Select(_ => CreateFailureResult("Request timed out", "PLATFORM_ERROR", ex)).ToList();
+        }
+    }
+
+    private async Task<(PlatformPostResult result, BlueskyCreateRecordResponse? raw)> CreatePostRecordAsync(
+        BlueskySession session,
+        string text,
+        IReadOnlyList<UploadedImage> images,
+        BlueskyReplyRef? reply,
+        CancellationToken cancellationToken)
+    {
+        var embed = BuildImageEmbed(images);
+        var facets = BlueskyFacetBuilder.BuildFacets(text);
+
+        var request = new BlueskyCreateRecordRequest
+        {
+            Repo = session.Did,
+            Collection = "app.bsky.feed.post",
+            Record = new BlueskyPostRecord
+            {
+                Text = text,
+                CreatedAt = DateTimeOffset.UtcNow.ToString("o"),
+                Facets = facets,
+                Embed = embed,
+                Reply = reply
+            }
+        };
+
+        SetAuthHeader(session.AccessJwt);
+        var response = await httpClient.PostAsJsonAsync(
+            "/xrpc/com.atproto.repo.createRecord",
+            request,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await ReadErrorAsync(response, cancellationToken);
+            return (CreateFailureResult(error.errorMessage, error.errorCode), null);
+        }
+
+        var raw = await response.Content.ReadFromJsonAsync<BlueskyCreateRecordResponse>(cancellationToken);
+        var postUrl = BuildPostUrl(session.Handle, raw!.Uri);
+
+        var postResult = new PlatformPostResult
+        {
+            Platform = PlatformName,
+            Success = true,
+            PostId = raw.Uri,
+            PostUrl = postUrl,
+            PublishedText = text
+        };
+
+        return (postResult, raw);
     }
 
     public async Task<UploadedImage> UploadImageAsync(

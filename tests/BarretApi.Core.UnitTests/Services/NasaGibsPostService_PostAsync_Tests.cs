@@ -46,6 +46,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
         _socialPostService = new SocialPostService(
             [_blueskyClient, _mastodonClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             imageResizer,
             hashtagService,

@@ -6,6 +6,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<EmbeddedResource Include="Fonts\JetBrainsMono-Bold.ttf" />
+		<EmbeddedResource Include="Fonts\JetBrainsMono-Regular.ttf" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="Azure.Data.Tables" />
 		<PackageReference Include="Azure.Storage.Blobs" />
 		<PackageReference Include="Azure.Identity" />

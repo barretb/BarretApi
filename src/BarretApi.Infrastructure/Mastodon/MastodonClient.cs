@@ -27,14 +27,59 @@ public sealed class MastodonClient(
         IReadOnlyList<UploadedImage> images,
         CancellationToken cancellationToken = default)
     {
+        return await PostStatusAsync(text, images, inReplyToId: null, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PlatformPostResult>> PostThreadAsync(
+        IReadOnlyList<ThreadSegmentPost> segments,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<PlatformPostResult>();
+        string? replyToId = null;
+
+        foreach (var segment in segments)
+        {
+            var result = await PostStatusAsync(segment.Text, segment.Images, replyToId, cancellationToken);
+            results.Add(result);
+
+            if (!result.Success)
+            {
+                break;
+            }
+
+            replyToId = result.PostId;
+        }
+
+        while (results.Count < segments.Count)
+        {
+            results.Add(new PlatformPostResult
+            {
+                Platform = PlatformName,
+                Success = false,
+                ErrorMessage = "Previous segment failed",
+                ErrorCode = "THREAD_BROKEN"
+            });
+        }
+
+        return results;
+    }
+
+    private async Task<PlatformPostResult> PostStatusAsync(
+        string text,
+        IReadOnlyList<UploadedImage> images,
+        string? inReplyToId,
+        CancellationToken cancellationToken)
+    {
         try
         {
             SetAuthHeader();
 
-            var formData = new List<KeyValuePair<string, string>>
+            var formData = new List<KeyValuePair<string, string>> { new("status", text) };
+
+            if (inReplyToId is not null)
             {
-                new("status", text)
-            };
+                formData.Add(new KeyValuePair<string, string>("in_reply_to_id", inReplyToId));
+            }
 
             foreach (var image in images)
             {

@@ -51,6 +51,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_Header_Tests
         var socialPostService = new SocialPostService(
             [_platformClient],
             textShorteningService,
+            Substitute.For<ITextSplitterService>(),
             imageDownloadService,
             Substitute.For<IImageResizer>(),
             hashtagService,

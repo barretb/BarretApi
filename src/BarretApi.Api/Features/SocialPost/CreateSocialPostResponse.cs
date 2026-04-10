@@ -7,6 +7,7 @@ public sealed class CreateSocialPostResponse
     public bool Scheduled { get; init; }
     public string? ScheduledPostId { get; init; }
     public DateTimeOffset? ScheduledFor { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class PlatformResult
@@ -16,6 +17,18 @@ public sealed class PlatformResult
     public string? PostId { get; init; }
     public string? PostUrl { get; init; }
     public string? ShortenedText { get; init; }
+    public string? Error { get; init; }
+    public string? ErrorCode { get; init; }
+    public bool Threaded { get; init; }
+    public List<ThreadedPostResult>? ThreadedPosts { get; init; }
+}
+
+public sealed class ThreadedPostResult
+{
+    public required bool Success { get; init; }
+    public string? PostId { get; init; }
+    public string? PostUrl { get; init; }
+    public string? PublishedText { get; init; }
     public string? Error { get; init; }
     public string? ErrorCode { get; init; }
 }

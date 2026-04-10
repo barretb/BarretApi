@@ -15,6 +15,10 @@ public interface ISocialPlatformClient
         ImageData image,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PlatformPostResult>> PostThreadAsync(
+        IReadOnlyList<ThreadSegmentPost> segments,
+        CancellationToken cancellationToken = default);
+
     Task<PlatformConfiguration> GetConfigurationAsync(
         CancellationToken cancellationToken = default);
 }
