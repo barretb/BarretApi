@@ -7,6 +7,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Content Include="images\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\BarretApi.Core\BarretApi.Core.csproj" />
 		<ProjectReference Include="..\BarretApi.Infrastructure\BarretApi.Infrastructure.csproj" />
 		<ProjectReference Include="..\BarretApi.ServiceDefaults\BarretApi.ServiceDefaults.csproj" />
