@@ -67,7 +67,7 @@ public sealed class GenerateHeroImageEndpoint(
 		{
 			imageBytes = await _generator.GenerateAsync(command, ct);
 		}
-		catch (InvalidOperationException ex) when (ex.Message.Contains("decode", StringComparison.OrdinalIgnoreCase))
+		catch (InvalidOperationException ex) when (customBackgroundBytes is not null && ex.Message.Contains("custom background", StringComparison.OrdinalIgnoreCase))
 		{
 			_logger.LogWarning("Uploaded background image could not be decoded: {Message}", ex.Message);
 			await SendErrorResponseAsync("The uploaded background image could not be decoded as a valid image.", 422, ct);
