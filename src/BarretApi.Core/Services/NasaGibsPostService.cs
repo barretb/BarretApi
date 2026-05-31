@@ -10,12 +10,14 @@ public class NasaGibsPostService(
     INasaGibsClient nasaGibsClient,
     SocialPostService socialPostService,
     IOptions<NasaGibsOptions> options,
-    ILogger<NasaGibsPostService> logger)
+    ILogger<NasaGibsPostService> logger,
+    IEmailNotificationService? emailNotificationService = null)
 {
     private readonly INasaGibsClient _nasaGibsClient = nasaGibsClient;
     private readonly SocialPostService _socialPostService = socialPostService;
     private readonly NasaGibsOptions _options = options.Value;
     private readonly ILogger<NasaGibsPostService> _logger = logger;
+    private readonly IEmailNotificationService? _emailNotificationService = emailNotificationService;
 
     public virtual async Task<SatellitePostResult> PostAsync(
         DateOnly? date,
@@ -86,6 +88,13 @@ public class NasaGibsPostService(
 
         var platformResults = await _socialPostService.PostAsync(socialPost, cancellationToken);
 
+        await NotifyFailuresAsync(
+            resolvedDate,
+            resolvedLayer,
+            resolvedTitle,
+            platformResults,
+            cancellationToken);
+
         return new SatellitePostResult(
             Date: resolvedDate,
             Layer: resolvedLayer,
@@ -100,6 +109,48 @@ public class NasaGibsPostService(
             ImageAttached: true,
             ImageResized: false,
             PlatformResults: platformResults);
+    }
+
+    private async Task NotifyFailuresAsync(
+        DateOnly date,
+        string layer,
+        string title,
+        IReadOnlyList<PlatformPostResult> platformResults,
+        CancellationToken cancellationToken)
+    {
+        if (_emailNotificationService is null)
+        {
+            return;
+        }
+
+        var failures = platformResults.Where(r => !r.Success).ToList();
+        if (failures.Count == 0)
+        {
+            return;
+        }
+
+        var errorDetails = string.Join("\n\n", failures.Select(f =>
+            $"Platform: {f.Platform}\nError Code: {f.ErrorCode ?? "N/A"}\nError Message: {f.ErrorMessage ?? "N/A"}"));
+
+        var context = new Dictionary<string, string>
+        {
+            ["Satellite Title"] = title,
+            ["Date"] = date.ToString("yyyy-MM-dd"),
+            ["Layer"] = layer,
+            ["Total Platforms"] = platformResults.Count.ToString(),
+            ["Failed Platforms"] = failures.Count.ToString(),
+            ["Successful Platforms"] = platformResults.Count(r => r.Success).ToString()
+        };
+
+        await _emailNotificationService.SendPostFailureNotificationAsync(
+            "NASA GIBS Satellite",
+            errorDetails,
+            context,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Sent failure notification email for NASA GIBS post with {FailureCount} failed platform(s)",
+            failures.Count);
     }
 
     private static string BuildWorldviewUrl(string layer, DateOnly date, double south, double west, double north, double east)

@@ -11,13 +11,15 @@ public sealed class BlogPromotionOrchestrator(
     IBlogPostPromotionRepository promotionRepository,
     SocialPostService socialPostService,
     IOptions<BlogPromotionOptions> blogPromotionOptions,
-    ILogger<BlogPromotionOrchestrator> logger) : IBlogPromotionOrchestrator
+    ILogger<BlogPromotionOrchestrator> logger,
+    IEmailNotificationService? emailNotificationService = null) : IBlogPromotionOrchestrator
 {
     private readonly IBlogFeedReader _blogFeedReader = blogFeedReader;
     private readonly IBlogPostPromotionRepository _promotionRepository = promotionRepository;
     private readonly SocialPostService _socialPostService = socialPostService;
     private readonly BlogPromotionOptions _options = blogPromotionOptions.Value;
     private readonly ILogger<BlogPromotionOrchestrator> _logger = logger;
+    private readonly IEmailNotificationService? _emailNotificationService = emailNotificationService;
 
     public async Task<PromotionRunSummary> RunAsync(
         string? feedUrl = null,
@@ -209,7 +211,46 @@ public sealed class BlogPromotionOrchestrator(
         }
 
         summary.CompletedAtUtc = DateTimeOffset.UtcNow;
+
+        await NotifyRunFailuresAsync(summary, cancellationToken);
+
         return summary;
+    }
+
+    private async Task NotifyRunFailuresAsync(
+        PromotionRunSummary summary,
+        CancellationToken cancellationToken)
+    {
+        if (_emailNotificationService is null || summary.Failures.Count == 0)
+        {
+            return;
+        }
+
+        var errorDetails = string.Join("\n\n", summary.Failures.Select(f =>
+            $"Blog Post: {f.EntryIdentity}\nURL: {f.CanonicalUrl}\nPhase: {f.Phase}\nPlatform: {f.Platform}\nError Code: {f.ErrorCode}\nError Message: {f.ErrorMessage}"));
+
+        var context = new Dictionary<string, string>
+        {
+            ["Run ID"] = summary.RunId,
+            ["Started At"] = summary.StartedAtUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+            ["Entries Evaluated"] = summary.EntriesEvaluated.ToString(),
+            ["New Posts Attempted"] = summary.NewPostsAttempted.ToString(),
+            ["New Posts Succeeded"] = summary.NewPostsSucceeded.ToString(),
+            ["Reminder Posts Attempted"] = summary.ReminderPostsAttempted.ToString(),
+            ["Reminder Posts Succeeded"] = summary.ReminderPostsSucceeded.ToString(),
+            ["Total Failures"] = summary.Failures.Count.ToString()
+        };
+
+        await _emailNotificationService.SendPostFailureNotificationAsync(
+            "Blog Promotion",
+            errorDetails,
+            context,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Sent failure notification email for blog promotion run {RunId} with {FailureCount} failure(s)",
+            summary.RunId,
+            summary.Failures.Count);
     }
 
     private void ValidateOptions()

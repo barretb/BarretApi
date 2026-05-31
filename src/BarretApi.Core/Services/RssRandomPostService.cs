@@ -7,11 +7,13 @@ namespace BarretApi.Core.Services;
 public sealed class RssRandomPostService(
     IBlogFeedReader blogFeedReader,
     SocialPostService socialPostService,
-    ILogger<RssRandomPostService> logger)
+    ILogger<RssRandomPostService> logger,
+    IEmailNotificationService? emailNotificationService = null)
 {
     private readonly IBlogFeedReader _blogFeedReader = blogFeedReader;
     private readonly SocialPostService _socialPostService = socialPostService;
     private readonly ILogger<RssRandomPostService> _logger = logger;
+    private readonly IEmailNotificationService? _emailNotificationService = emailNotificationService;
 
     public async Task<RssRandomPostResult> SelectAndPostAsync(
         RssRandomPostQuery query,

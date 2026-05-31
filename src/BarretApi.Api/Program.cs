@@ -53,6 +53,8 @@ builder.Services
 builder.Services.AddSingleton<IValidateOptions<ScheduledSocialPostOptions>>(
     new OptionsValidatorAdapter<ScheduledSocialPostOptions>(o => o.Validate()));
 
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+
 builder.Services
     .AddAuthentication(ApiKeyAuthHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthHandler>(ApiKeyAuthHandler.SchemeName, null);
@@ -117,6 +119,32 @@ builder.Services.AddSingleton<IImageDownloadService>(sp =>
 builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPromotionRepository>();
 builder.Services.AddSingleton<IScheduledSocialPostRepository, AzureTableScheduledSocialPostRepository>();
 builder.Services.AddSingleton<IScheduledPostImageStore, AzureBlobScheduledPostImageStore>();
+builder.Services.AddSingleton<IEmailRateLimiter>(sp =>
+{
+    var useAzureStorage = !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:ConnectionString"])
+        || !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:AccountEndpoint"]);
+
+    if (useAzureStorage)
+    {
+        var scheduledPostOptions = sp.GetRequiredService<IOptions<ScheduledSocialPostOptions>>();
+        var connectionString = scheduledPostOptions.Value.TableStorage.ConnectionString;
+        var accountEndpoint = scheduledPostOptions.Value.TableStorage.AccountEndpoint;
+
+        var tableServiceClient = !string.IsNullOrWhiteSpace(connectionString)
+            ? new Azure.Data.Tables.TableServiceClient(connectionString)
+            : new Azure.Data.Tables.TableServiceClient(
+                new Uri(accountEndpoint),
+                new Azure.Identity.DefaultAzureCredential());
+
+        return new AzureTableEmailRateLimiter(
+            tableServiceClient,
+            sp.GetRequiredService<ILogger<AzureTableEmailRateLimiter>>());
+    }
+
+    return new InMemoryEmailRateLimiter(
+        sp.GetRequiredService<ILogger<InMemoryEmailRateLimiter>>());
+});
+builder.Services.AddSingleton<IEmailNotificationService, SmtpEmailNotificationService>();
 builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
 builder.Services.AddSingleton<IScheduledSocialPostProcessor, ScheduledSocialPostProcessor>();
 builder.Services.AddSingleton<SocialPostService>();

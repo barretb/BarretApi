@@ -11,7 +11,8 @@ public sealed class ScheduledSocialPostProcessor(
     SocialPostService socialPostService,
     IScheduledPostImageStore scheduledPostImageStore,
     IOptions<ScheduledSocialPostOptions> options,
-    ILogger<ScheduledSocialPostProcessor> logger)
+    ILogger<ScheduledSocialPostProcessor> logger,
+    IEmailNotificationService? emailNotificationService = null)
     : IScheduledSocialPostProcessor
 {
     private readonly IScheduledSocialPostRepository _scheduledSocialPostRepository = scheduledSocialPostRepository;
@@ -19,6 +20,7 @@ public sealed class ScheduledSocialPostProcessor(
     private readonly IScheduledPostImageStore _scheduledPostImageStore = scheduledPostImageStore;
     private readonly ScheduledSocialPostOptions _options = options.Value;
     private readonly ILogger<ScheduledSocialPostProcessor> _logger = logger;
+    private readonly IEmailNotificationService? _emailNotificationService = emailNotificationService;
 
     public async Task<ScheduledPostProcessingSummary> ProcessDueAsync(
         int? maxCount,
@@ -94,6 +96,8 @@ public sealed class ScheduledSocialPostProcessor(
                 ErrorMessage = errorMessage,
                 AttemptedAtUtc = DateTimeOffset.UtcNow
             });
+
+            await NotifyScheduledPostFailureAsync(dueRecord, results, errorCode, errorMessage, cancellationToken);
         }
 
         var summary = new ScheduledPostProcessingSummary
@@ -119,6 +123,47 @@ public sealed class ScheduledSocialPostProcessor(
             summary.SkippedCount);
 
         return summary;
+    }
+
+    private async Task NotifyScheduledPostFailureAsync(
+        ScheduledSocialPostRecord record,
+        IReadOnlyList<PlatformPostResult> platformResults,
+        string errorCode,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        if (_emailNotificationService is null)
+        {
+            return;
+        }
+
+        var failures = platformResults.Where(r => !r.Success).ToList();
+        var errorDetails = failures.Count > 0
+            ? string.Join("\n\n", failures.Select(f =>
+                $"Platform: {f.Platform}\nError Code: {f.ErrorCode ?? "N/A"}\nError Message: {f.ErrorMessage ?? "N/A"}"))
+            : $"Error Code: {errorCode}\nError Message: {errorMessage}";
+
+        var context = new Dictionary<string, string>
+        {
+            ["Scheduled Post ID"] = record.ScheduledPostId,
+            ["Scheduled For"] = record.ScheduledForUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+            ["Post Text"] = record.Text.Length > 100 ? record.Text[..100] + "..." : record.Text,
+            ["Target Platforms"] = string.Join(", ", record.TargetPlatforms),
+            ["Attempt Count"] = record.AttemptCount.ToString(),
+            ["Total Platforms"] = platformResults.Count.ToString(),
+            ["Failed Platforms"] = failures.Count.ToString(),
+            ["Successful Platforms"] = platformResults.Count(r => r.Success).ToString()
+        };
+
+        await _emailNotificationService.SendPostFailureNotificationAsync(
+            "Scheduled Social Post",
+            errorDetails,
+            context,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Sent failure notification email for scheduled post {ScheduledPostId}",
+            record.ScheduledPostId);
     }
 
     private async Task<SocialPost> MapToSocialPostAsync(ScheduledSocialPostRecord record, CancellationToken cancellationToken)

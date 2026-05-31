@@ -8,12 +8,14 @@ public class NasaApodPostService(
     INasaApodClient nasaApodClient,
     SocialPostService socialPostService,
     IImageResizer imageResizer,
-    ILogger<NasaApodPostService> logger)
+    ILogger<NasaApodPostService> logger,
+    IEmailNotificationService? emailNotificationService = null)
 {
     private readonly INasaApodClient _nasaApodClient = nasaApodClient;
     private readonly SocialPostService _socialPostService = socialPostService;
     private readonly IImageResizer _imageResizer = imageResizer;
     private readonly ILogger<NasaApodPostService> _logger = logger;
+    private readonly IEmailNotificationService? _emailNotificationService = emailNotificationService;
 
     public virtual async Task<ApodPostResult> PostAsync(
         DateOnly? date,

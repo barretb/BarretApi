@@ -1898,6 +1898,69 @@ No API key required — NASA GIBS is publicly accessible.
 | `NasaGibs:ImageWidth` | `gibs-image-width` | `NasaGibs__ImageWidth` | No | `1024` | Snapshot image width in pixels. |
 | `NasaGibs:ImageHeight` | `gibs-image-height` | `NasaGibs__ImageHeight` | No | `768` | Snapshot image height in pixels. |
 
+### Email Notifications
+
+Email notifications are sent when social media post processes fail. The system includes **automatic rate limiting** to prevent email flooding.
+
+#### Configuration
+
+| Config Key | Aspire Parameter | Environment Variable | Required | Default | Description |
+|---|---|---|---|---|---|
+| `Email:Enabled` | `email-enabled` | `Email__Enabled` | No | `false` | Enable email failure notifications. |
+| `Email:SmtpHost` | `email-smtp-host` | `Email__SmtpHost` | Yes* | — | SMTP server hostname (e.g., `smtp.gmail.com`). |
+| `Email:SmtpPort` | `email-smtp-port` | `Email__SmtpPort` | No | `587` | SMTP server port (typically 587 for TLS, 465 for SSL). |
+| `Email:UseSsl` | `email-use-ssl` | `Email__UseSsl` | No | `true` | Enable SSL/TLS encryption. |
+| `Email:Username` | `email-username` | `Email__Username` | Yes* | — | SMTP authentication username. |
+| `Email:Password` | `email-password` | `Email__Password` | Yes* | — | SMTP authentication password or app password. |
+| `Email:FromAddress` | `email-from-address` | `Email__FromAddress` | Yes* | — | Email address to send notifications from. |
+| `Email:FromName` | `email-from-name` | `Email__FromName` | Yes* | — | Display name for the sender. |
+| `Email:ToAddress` | `email-to-address` | `Email__ToAddress` | Yes* | — | Email address to receive notifications. |
+
+**\*Required only when `Email:Enabled` is `true`.**
+
+#### Rate Limiting (Automatic)
+
+Rate limiting is **always active** when email notifications are enabled. No additional configuration is required.
+
+| Setting | Value | Description |
+|---|---|---|
+| **Limit** | 1 email per post type per 24 hours | Each failure type tracked independently |
+| **Post Types** | NASA APOD, NASA GIBS Satellite, RSS Blog Post, Scheduled Social Post, Blog Promotion | Separate limits for each |
+| **Storage** | Azure Table Storage (`EmailRateLimit` table) or in-memory | Automatic selection based on environment |
+| **Behavior** | First failure sends email, subsequent failures within 24h are suppressed | Prevents notification flooding |
+
+**Storage Selection:**
+- **Production (Azure Storage configured):** Uses Azure Table Storage for persistent, distributed-safe rate limiting
+- **Development (Azure Storage not configured):** Uses in-memory storage (resets on app restart)
+- **Storage Account:** Rate limiting automatically uses the same Azure Storage account as Scheduled Posts if configured
+- **Table Name:** `EmailRateLimit` (created automatically)
+
+**Resetting Rate Limits:**
+- **Azure Storage:** Delete rows from the `EmailRateLimit` table
+- **In-Memory:** Restart the application
+
+#### Gmail Configuration Example
+
+```json
+{
+  "Email": {
+    "Enabled": true,
+    "SmtpHost": "smtp.gmail.com",
+    "SmtpPort": 587,
+    "UseSsl": true,
+    "Username": "yourname@gmail.com",
+    "Password": "your-app-password",
+    "FromAddress": "yourname@gmail.com",
+    "FromName": "BarretApi Notifications",
+    "ToAddress": "admin@yourdomain.com"
+  }
+}
+```
+
+**Note:** For Gmail, you must enable 2-factor authentication and generate an app password at <https://myaccount.google.com/apppasswords>.
+
+**Complete Documentation:** See [`docs/EMAIL_NOTIFICATIONS.md`](docs/EMAIL_NOTIFICATIONS.md) and [`docs/EMAIL_RATE_LIMITING.md`](docs/EMAIL_RATE_LIMITING.md) for detailed information on email notifications, rate limiting, troubleshooting, and production deployment.
+
 ## Production Notes
 
 ### HTTPS Requirement
