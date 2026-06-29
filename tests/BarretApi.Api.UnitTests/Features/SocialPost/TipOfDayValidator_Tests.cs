@@ -56,12 +56,31 @@ public sealed class AddTipOfDayValidator_Tests
 	[Fact]
 	public async Task ReturnsError_GivenMissingTip()
 	{
-		var request = new AddTipOfDayRequest { Category = "dotnet" };
+		var request = new AddTipOfDayRequest
+		{
+			Category = "dotnet",
+			Tips = [new AddTipOfDayItem()]
+		};
 
 		var result = await _validator.ValidateAsync(request);
 
 		result.IsValid.ShouldBeFalse();
-		result.Errors.ShouldContain(e => e.PropertyName == "Tip");
+		result.Errors.ShouldContain(e => e.PropertyName.Contains("Tips"));
+	}
+
+	[Fact]
+	public async Task ReturnsError_GivenEmptyTips()
+	{
+		var request = new AddTipOfDayRequest
+		{
+			Category = "dotnet",
+			Tips = []
+		};
+
+		var result = await _validator.ValidateAsync(request);
+
+		result.IsValid.ShouldBeFalse();
+		result.Errors.ShouldContain(e => e.PropertyName == "Tips");
 	}
 
 	[Fact]
@@ -70,14 +89,20 @@ public sealed class AddTipOfDayValidator_Tests
 		var request = new AddTipOfDayRequest
 		{
 			Category = "dotnet",
-			Tip = "Use nullable annotations.",
-			MoreInfoUrl = "ftp://example.com/tip"
+			Tips =
+			[
+				new AddTipOfDayItem
+				{
+					Tip = "Use nullable annotations.",
+					MoreInfoUrl = "ftp://example.com/tip"
+				}
+			]
 		};
 
 		var result = await _validator.ValidateAsync(request);
 
 		result.IsValid.ShouldBeFalse();
-		result.Errors.ShouldContain(e => e.PropertyName == "MoreInfoUrl");
+		result.Errors.ShouldContain(e => e.PropertyName.Contains("MoreInfoUrl"));
 	}
 
 	[Fact]
@@ -86,8 +111,39 @@ public sealed class AddTipOfDayValidator_Tests
 		var request = new AddTipOfDayRequest
 		{
 			Category = "dotnet",
-			Tip = "Use nullable annotations.",
-			MoreInfoUrl = "https://example.com/tip"
+			Tips =
+			[
+				new AddTipOfDayItem
+				{
+					Tip = "Use nullable annotations.",
+					MoreInfoUrl = "https://example.com/tip"
+				}
+			]
+		};
+
+		var result = await _validator.ValidateAsync(request);
+
+		result.IsValid.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task ReturnsNoError_GivenMultipleValidTips()
+	{
+		var request = new AddTipOfDayRequest
+		{
+			Category = "dotnet",
+			Tips =
+			[
+				new AddTipOfDayItem
+				{
+					Tip = "Use nullable annotations."
+				},
+				new AddTipOfDayItem
+				{
+					Tip = "Prefer file-scoped namespaces.",
+					MoreInfoUrl = "https://example.com/tip"
+				}
+			]
 		};
 
 		var result = await _validator.ValidateAsync(request);

@@ -158,6 +158,36 @@ public sealed class TipOfDayService_SelectAndPostAsync_Tests
 		ex.Message.ShouldContain("No eligible tips");
 	}
 
+	[Fact]
+	public async Task AddsAllTips_GivenMultipleTips()
+	{
+		var result = await _sut.AddTipsAsync(
+			"dotnet",
+			[
+				("Use nullable annotations.", null),
+				("Prefer file-scoped namespaces.", "https://example.com/tip")
+			]);
+
+		result.Count.ShouldBe(2);
+		result[0].Category.ShouldBe("dotnet");
+		result[0].Tip.ShouldBe("Use nullable annotations.");
+		result[0].MoreInfoUrl.ShouldBeNull();
+		result[1].Tip.ShouldBe("Prefer file-scoped namespaces.");
+		result[1].MoreInfoUrl.ShouldBe("https://example.com/tip");
+		await _tipRepository.Received(2).AddAsync(
+			Arg.Any<TipOfDayRecord>(),
+			Arg.Any<CancellationToken>());
+	}
+
+	[Fact]
+	public async Task ThrowsArgumentException_GivenNoTipsToAdd()
+	{
+		var ex = await Should.ThrowAsync<ArgumentException>(
+			() => _sut.AddTipsAsync("dotnet", []));
+
+		ex.Message.ShouldContain("At least one tip");
+	}
+
 	private static TipOfDayRecord CreateTip(string? moreInfoUrl = null)
 	{
 		return new TipOfDayRecord

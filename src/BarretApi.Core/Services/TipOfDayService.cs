@@ -73,21 +73,45 @@ public sealed class TipOfDayService(
 		string? moreInfoUrl,
 		CancellationToken cancellationToken = default)
 	{
+		var records = await AddTipsAsync(category, [(tip, moreInfoUrl)], cancellationToken);
+		return records[0];
+	}
+
+	public async Task<IReadOnlyList<TipOfDayRecord>> AddTipsAsync(
+		string category,
+		IEnumerable<(string Tip, string? MoreInfoUrl)> tips,
+		CancellationToken cancellationToken = default)
+	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(category);
-		ArgumentException.ThrowIfNullOrWhiteSpace(tip);
+		ArgumentNullException.ThrowIfNull(tips);
 
-		var record = new TipOfDayRecord
+		var records = new List<TipOfDayRecord>();
+		foreach (var tip in tips)
 		{
-			TipId = Guid.NewGuid().ToString("N"),
-			Category = category.Trim(),
-			Tip = tip.Trim(),
-			MoreInfoUrl = string.IsNullOrWhiteSpace(moreInfoUrl) ? null : moreInfoUrl.Trim(),
-			LastPostedDate = null,
-			CreatedAtUtc = DateTimeOffset.UtcNow
-		};
+			ArgumentException.ThrowIfNullOrWhiteSpace(tip.Tip);
 
-		await _tipOfDayRepository.AddAsync(record, cancellationToken);
-		return record;
+			records.Add(new TipOfDayRecord
+			{
+				TipId = Guid.NewGuid().ToString("N"),
+				Category = category.Trim(),
+				Tip = tip.Tip.Trim(),
+				MoreInfoUrl = string.IsNullOrWhiteSpace(tip.MoreInfoUrl) ? null : tip.MoreInfoUrl.Trim(),
+				LastPostedDate = null,
+				CreatedAtUtc = DateTimeOffset.UtcNow
+			});
+		}
+
+		if (records.Count == 0)
+		{
+			throw new ArgumentException("At least one tip is required.", nameof(tips));
+		}
+
+		foreach (var record in records)
+		{
+			await _tipOfDayRepository.AddAsync(record, cancellationToken);
+		}
+
+		return records;
 	}
 
 	private static string BuildPostText(TipOfDayRecord tip, string? leader)

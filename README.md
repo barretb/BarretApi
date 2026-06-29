@@ -722,7 +722,7 @@ curl -s -X POST https://localhost:7042/api/social-posts/rss-random \
 
 ### POST /api/social-posts/tips — Add Tip of the Day
 
-Adds a categorized tip to Azure Table Storage. New tips start with `lastPostedDate = null`, making them eligible for future tip-of-the-day posting.
+Adds one or more categorized tips to Azure Table Storage. New tips start with `lastPostedDate = null`, making them eligible for future tip-of-the-day posting.
 
 | Detail | Value |
 |---|---|
@@ -734,8 +734,9 @@ Adds a categorized tip to Azure Table Storage. New tips start with `lastPostedDa
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `category` | `string` | Yes | Tip category used for later random selection. |
-| `tip` | `string` | Yes | Tip text to post. |
-| `moreInfoUrl` | `string` | No | Optional HTTP/HTTPS URL appended to the post. |
+| `tips` | `object[]` | Yes | One or more tip objects. Maximum 100 per request. |
+| `tips[].tip` | `string` | Yes | Tip text to post. |
+| `tips[].moreInfoUrl` | `string` | No | Optional HTTP/HTTPS URL appended to the post. |
 
 ```http
 POST /api/social-posts/tips
@@ -746,8 +747,15 @@ Content-Type: application/json
 ```json
 {
   "category": "dotnet",
-  "tip": "Prefer file-scoped namespaces for new C# files.",
-  "moreInfoUrl": "https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/namespace"
+  "tips": [
+    {
+      "tip": "Prefer file-scoped namespaces for new C# files.",
+      "moreInfoUrl": "https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/namespace"
+    },
+    {
+      "tip": "Use primary constructors when they make dependencies obvious."
+    }
+  ]
 }
 ```
 
@@ -755,7 +763,7 @@ Content-Type: application/json
 
 | Code | Meaning |
 |---|---|
-| **201** | Tip was added. |
+| **201** | Tips were added. |
 | **400** | Request validation failed. |
 | **401** | Missing or invalid `X-Api-Key`. |
 

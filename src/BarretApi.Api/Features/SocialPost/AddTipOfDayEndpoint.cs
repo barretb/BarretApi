@@ -20,10 +20,16 @@ public sealed class AddTipOfDayEndpoint(
 			s.ExampleRequest = new AddTipOfDayRequest
 			{
 				Category = "dotnet",
-				Tip = "Use ConfigureAwait(false) in reusable library code when you do not need to resume on the captured context.",
-				MoreInfoUrl = "https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/"
+				Tips =
+				[
+					new AddTipOfDayItem
+					{
+						Tip = "Use ConfigureAwait(false) in reusable library code when you do not need to resume on the captured context.",
+						MoreInfoUrl = "https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/"
+					}
+				]
 			};
-			s.Responses[201] = "Tip was added.";
+			s.Responses[201] = "Tips were added.";
 			s.Responses[400] = "Request validation failed.";
 			s.Responses[401] = "Missing or invalid X-Api-Key.";
 		});
@@ -33,15 +39,21 @@ public sealed class AddTipOfDayEndpoint(
 	{
 		logger.LogInformation("Add tip of the day request received for category {Category}", req.Category);
 
-		var record = await tipOfDayService.AddTipAsync(req.Category!, req.Tip!, req.MoreInfoUrl, ct);
+		var records = await tipOfDayService.AddTipsAsync(
+			req.Category!,
+			req.Tips!.Select(t => (Tip: t.Tip!, MoreInfoUrl: t.MoreInfoUrl)),
+			ct);
 		var response = new AddTipOfDayResponse
 		{
-			TipId = record.TipId,
-			Category = record.Category,
-			Tip = record.Tip,
-			MoreInfoUrl = record.MoreInfoUrl,
-			LastPostedDate = record.LastPostedDate,
-			CreatedAtUtc = record.CreatedAtUtc
+			Tips = records.Select(record => new AddedTipOfDayItem
+			{
+				TipId = record.TipId,
+				Category = record.Category,
+				Tip = record.Tip,
+				MoreInfoUrl = record.MoreInfoUrl,
+				LastPostedDate = record.LastPostedDate,
+				CreatedAtUtc = record.CreatedAtUtc
+			}).ToList()
 		};
 
 		await Send.ResponseAsync(response, 201, ct);
