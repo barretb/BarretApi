@@ -13,6 +13,8 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [POST /api/social-posts/scheduled/process — Process Due Scheduled Posts](#post-apisocial-postsscheduledprocess--process-due-scheduled-posts)
   - [POST /api/social-posts/rss-promotion — Trigger RSS Blog Promotion](#post-apisocial-postsrss-promotion--trigger-rss-blog-promotion)
   - [POST /api/social-posts/rss-random — Post Random RSS Entry](#post-apisocial-postsrss-random--post-random-rss-entry)
+  - [POST /api/social-posts/tips — Add Tip of the Day](#post-apisocial-poststips--add-tip-of-the-day)
+  - [POST /api/social-posts/tips/post — Post Tip of the Day](#post-apisocial-poststipspost--post-tip-of-the-day)
   - [POST /api/social-posts/nasa-apod — Post NASA APOD to Social Platforms](#post-apisocial-postsnasa-apod--post-nasa-apod-to-social-platforms)
   - [POST /api/social-posts/satellite — Post Satellite Image](#post-apisocial-postssatellite--post-satellite-image)
   - [GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow](#get-apilinkedinauth--initiate-linkedin-oauth-flow)
@@ -715,6 +717,100 @@ curl -s -X POST https://localhost:7042/api/social-posts/rss-random \
 | **401** | Missing or invalid `X-Api-Key`. |
 | **422** | No eligible entries remain after filtering. |
 | **502** | Feed could not be read, or all targeted platform posts failed. |
+
+---
+
+### POST /api/social-posts/tips — Add Tip of the Day
+
+Adds a categorized tip to Azure Table Storage. New tips start with `lastPostedDate = null`, making them eligible for future tip-of-the-day posting.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `category` | `string` | Yes | Tip category used for later random selection. |
+| `tip` | `string` | Yes | Tip text to post. |
+| `moreInfoUrl` | `string` | No | Optional HTTP/HTTPS URL appended to the post. |
+
+```http
+POST /api/social-posts/tips
+X-Api-Key: <your-api-key>
+Content-Type: application/json
+```
+
+```json
+{
+  "category": "dotnet",
+  "tip": "Prefer file-scoped namespaces for new C# files.",
+  "moreInfoUrl": "https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/namespace"
+}
+```
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **201** | Tip was added. |
+| **400** | Request validation failed. |
+| **401** | Missing or invalid `X-Api-Key`. |
+
+---
+
+### POST /api/social-posts/tips/post — Post Tip of the Day
+
+Randomly selects an eligible tip from Azure Table Storage for the requested category, posts it to selected social platforms, then updates `lastPostedDate` when at least one platform succeeds. Eligible tips have `lastPostedDate = null` or were last posted before the configured cooldown window, which defaults to 180 days.
+
+The generated social text uses this format:
+
+```text
+leader
+tip
+optional URL
+```
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+| **Platforms** | `bluesky`, `mastodon`, `linkedin`; omit or empty for all configured platforms |
+
+#### Request Body
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `category` | `string` | Yes | — | Category to select tips from. |
+| `platforms` | `string[]` | No | All configured platforms | Social platforms to publish to. |
+| `leader` | `string` | No | — | Optional first line of the social post. |
+
+```http
+POST /api/social-posts/tips/post
+X-Api-Key: <your-api-key>
+Content-Type: application/json
+```
+
+```json
+{
+  "category": "dotnet",
+  "platforms": ["bluesky", "mastodon"],
+  "leader": "Tip of the day"
+}
+```
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **200** | All targeted platforms succeeded. |
+| **207** | Partial success — at least one platform succeeded and at least one failed. |
+| **400** | Request validation failed. |
+| **401** | Missing or invalid `X-Api-Key`. |
+| **422** | No eligible tips found for the requested category. |
+| **502** | All targeted platforms failed to post. |
 
 ---
 
@@ -1875,6 +1971,20 @@ ScheduledSocialPost__TableStorage__ConnectionString = (same value as LinkedIn__T
 - **Option A (Shared Connection String):** Set `ScheduledSocialPost__TableStorage__ConnectionString` to your Azure Storage account connection string (simplest for single-account deployments).
 - **Option B (Managed Identity):** Set `ScheduledSocialPost__TableStorage__AccountEndpoint` and configure managed identity on your Azure resource.
 - **Table Name Rule:** `ScheduledSocialPost__TableStorage__TableName` must be 3-63 chars, start with a letter, and contain letters/numbers only. Use lowercase values such as `scheduledsocialposts`.
+
+### Tip of the Day
+
+Tips are stored in Azure Table Storage and posted on-demand via `/api/social-posts/tips/post`. At least one storage option must be configured.
+
+| Config Key | Aspire Parameter | Environment Variable | Required | Default | Description |
+|---|---|---|---|---|---|
+| `TipOfDay:RepostCooldownDays` | `tip-of-day-repost-cooldown-days` | `TipOfDay__RepostCooldownDays` | No | `180` | Minimum days before a previously posted tip can be selected again. |
+| `TipOfDay:TableStorage:ConnectionString` | — | `TipOfDay__TableStorage__ConnectionString` | No* | — | Azure Table Storage connection string. Hardcoded to Azurite in AppHost. |
+| `TipOfDay:TableStorage:AccountEndpoint` | — | `TipOfDay__TableStorage__AccountEndpoint` | No* | — | Azure Table Storage account endpoint. Use with managed identity. |
+| `TipOfDay:TableStorage:TableName` | `tip-of-day-table-storage-table-name` | `TipOfDay__TableStorage__TableName` | No | `tipofthedaytips` | Table name for tip records. |
+| `TipOfDay:TableStorage:PartitionKey` | `tip-of-day-table-storage-partition-key` | `TipOfDay__TableStorage__PartitionKey` | No | `tip-of-the-day` | Partition key for tip records. |
+
+Either `ConnectionString` **or** `AccountEndpoint` must be set. The table name must be 3-63 characters, start with a letter, and contain letters/numbers only.
 
 ### NASA APOD
 

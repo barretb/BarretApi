@@ -52,6 +52,12 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<ScheduledSocialPostOptions>>(
     new OptionsValidatorAdapter<ScheduledSocialPostOptions>(o => o.Validate()));
+builder.Services
+    .AddOptions<TipOfDayOptions>()
+    .Bind(builder.Configuration.GetSection(TipOfDayOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<TipOfDayOptions>>(
+    new OptionsValidatorAdapter<TipOfDayOptions>(o => o.Validate()));
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 
@@ -119,6 +125,7 @@ builder.Services.AddSingleton<IImageDownloadService>(sp =>
 builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPromotionRepository>();
 builder.Services.AddSingleton<IScheduledSocialPostRepository, AzureTableScheduledSocialPostRepository>();
 builder.Services.AddSingleton<IScheduledPostImageStore, AzureBlobScheduledPostImageStore>();
+builder.Services.AddSingleton<ITipOfDayRepository, AzureTableTipOfDayRepository>();
 builder.Services.AddSingleton<IEmailRateLimiter>(sp =>
 {
     var useAzureStorage = !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:ConnectionString"])
@@ -149,6 +156,7 @@ builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestra
 builder.Services.AddSingleton<IScheduledSocialPostProcessor, ScheduledSocialPostProcessor>();
 builder.Services.AddSingleton<SocialPostService>();
 builder.Services.AddSingleton<RssRandomPostService>();
+builder.Services.AddSingleton<TipOfDayService>();
 
 builder.Services.Configure<NasaApodOptions>(builder.Configuration.GetSection(NasaApodOptions.SectionName));
 builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>

@@ -21,6 +21,9 @@ var scheduledSocialPostMaxBatchSize = builder.AddParameter("scheduled-social-pos
 var scheduledSocialPostTableStorageTableName = builder.AddParameter("scheduled-social-post-table-storage-table-name");
 var scheduledSocialPostTableStoragePartitionKey = builder.AddParameter("scheduled-social-post-table-storage-partition-key");
 var scheduledSocialPostBlobStorageContainerName = builder.AddParameter("scheduled-social-post-blob-storage-container-name");
+var tipOfDayRepostCooldownDays = builder.AddParameter("tip-of-day-repost-cooldown-days");
+var tipOfDayTableStorageTableName = builder.AddParameter("tip-of-day-table-storage-table-name");
+var tipOfDayTableStoragePartitionKey = builder.AddParameter("tip-of-day-table-storage-partition-key");
 var gitHubClientId = builder.AddParameter("github-client-id", secret: true);
 var gitHubClientSecret = builder.AddParameter("github-client-secret", secret: true);
 var gitHubApiBaseUrl = builder.AddParameter("github-api-base-url");
@@ -74,6 +77,10 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("ScheduledSocialPost__TableStorage__PartitionKey", scheduledSocialPostTableStoragePartitionKey)
     .WithEnvironment("ScheduledSocialPost__BlobStorage__ConnectionString", azuriteConnectionString)
     .WithEnvironment("ScheduledSocialPost__BlobStorage__ContainerName", scheduledSocialPostBlobStorageContainerName)
+    .WithEnvironment("TipOfDay__RepostCooldownDays", tipOfDayRepostCooldownDays)
+    .WithEnvironment("TipOfDay__TableStorage__ConnectionString", azuriteConnectionString)
+    .WithEnvironment("TipOfDay__TableStorage__TableName", tipOfDayTableStorageTableName)
+    .WithEnvironment("TipOfDay__TableStorage__PartitionKey", tipOfDayTableStoragePartitionKey)
     .WithEnvironment("NasaApod__ApiKey", nasaApodApiKey)
     .WithEnvironment("NasaGibs__BaseUrl", gibsBaseUrl)
     .WithEnvironment("NasaGibs__DefaultLayer", gibsDefaultLayer)
