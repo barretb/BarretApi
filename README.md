@@ -1984,6 +1984,8 @@ ScheduledSocialPost__TableStorage__ConnectionString = (same value as LinkedIn__T
 
 Tips are stored in Azure Table Storage and posted on-demand via `/api/social-posts/tips/post`. At least one storage option must be configured.
 
+Imported table rows can use either API-created Pascal-case fields (`Category`, `Tip`, `MoreInfoUrl`, `LastPostedDate`) or upload-friendly camel-case fields (`category`, `tip`, `moreInfoUrl`/`url`, `lastPostedDate`). The Azure Table system `Timestamp` is ignored for repost eligibility; only the explicit `LastPostedDate`/`lastPostedDate` property controls whether a tip has been posted recently.
+
 | Config Key | Aspire Parameter | Environment Variable | Required | Default | Description |
 |---|---|---|---|---|---|
 | `TipOfDay:RepostCooldownDays` | `tip-of-day-repost-cooldown-days` | `TipOfDay__RepostCooldownDays` | No | `180` | Minimum days before a previously posted tip can be selected again. |

@@ -62,14 +62,14 @@ public sealed class AzureTableTipOfDayRepository : ITipOfDayRepository
 		ArgumentException.ThrowIfNullOrWhiteSpace(category);
 		await EnsureInitializedAsync(cancellationToken);
 
-		var escapedCategory = EscapeODataString(category.Trim());
-		var filter = $"PartitionKey eq '{_options.TableStorage.PartitionKey}' and Category eq '{escapedCategory}'";
+		var filter = $"PartitionKey eq '{EscapeODataString(_options.TableStorage.PartitionKey)}'";
 		var records = new List<TipOfDayRecord>();
 
 		await foreach (var entity in _tableClient.QueryAsync<TableEntity>(filter, cancellationToken: cancellationToken))
 		{
 			var record = MapEntityToModel(entity);
-			if (!record.LastPostedDate.HasValue || record.LastPostedDate.Value <= repostCutoffUtc)
+			if (record.Category.Equals(category.Trim(), StringComparison.OrdinalIgnoreCase)
+				&& (!record.LastPostedDate.HasValue || record.LastPostedDate.Value <= repostCutoffUtc))
 			{
 				records.Add(record);
 			}
@@ -92,7 +92,8 @@ public sealed class AzureTableTipOfDayRepository : ITipOfDayRepository
 			cancellationToken: cancellationToken);
 
 		var entity = response.Value;
-		entity["LastPostedDate"] = postedAtUtc;
+		entity["lastPostedDate"] = postedAtUtc;
+		entity.Remove("LastPostedDate");
 		await _tableClient.UpdateEntityAsync(entity, entity.ETag, TableUpdateMode.Replace, cancellationToken);
 	}
 
@@ -173,36 +174,78 @@ public sealed class AzureTableTipOfDayRepository : ITipOfDayRepository
 	{
 		var entity = new TableEntity(_options.TableStorage.PartitionKey, record.TipId)
 		{
-			["TipId"] = record.TipId,
-			["Category"] = record.Category,
-			["Tip"] = record.Tip,
-			["CreatedAtUtc"] = record.CreatedAtUtc
+			["tipId"] = record.TipId,
+			["category"] = record.Category,
+			["tip"] = record.Tip,
+			["createdAtUtc"] = record.CreatedAtUtc
 		};
 
 		if (!string.IsNullOrWhiteSpace(record.MoreInfoUrl))
 		{
-			entity["MoreInfoUrl"] = record.MoreInfoUrl;
+			entity["moreInfoUrl"] = record.MoreInfoUrl;
 		}
 
 		if (record.LastPostedDate.HasValue)
 		{
-			entity["LastPostedDate"] = record.LastPostedDate.Value;
+			entity["lastPostedDate"] = record.LastPostedDate.Value;
 		}
 
 		return entity;
 	}
 
-	private static TipOfDayRecord MapEntityToModel(TableEntity entity)
+	internal static TipOfDayRecord MapEntityToModel(TableEntity entity)
 	{
 		return new TipOfDayRecord
 		{
-			TipId = entity.GetString("TipId") ?? entity.RowKey,
-			Category = entity.GetString("Category") ?? string.Empty,
-			Tip = entity.GetString("Tip") ?? string.Empty,
-			MoreInfoUrl = entity.GetString("MoreInfoUrl"),
-			LastPostedDate = entity.GetDateTimeOffset("LastPostedDate"),
-			CreatedAtUtc = entity.GetDateTimeOffset("CreatedAtUtc") ?? DateTimeOffset.MinValue
+			TipId = GetString(entity, "TipId", "tipId") ?? entity.RowKey,
+			Category = GetString(entity, "Category", "category") ?? string.Empty,
+			Tip = GetString(entity, "Tip", "tip") ?? string.Empty,
+			MoreInfoUrl = GetString(entity, "MoreInfoUrl", "moreInfoUrl", "Url", "url"),
+			LastPostedDate = GetDateTimeOffset(entity, "LastPostedDate", "lastPostedDate"),
+			CreatedAtUtc = GetDateTimeOffset(entity, "CreatedAtUtc", "createdAtUtc") ?? DateTimeOffset.MinValue
 		};
+	}
+
+	private static string? GetString(TableEntity entity, params string[] propertyNames)
+	{
+		foreach (var propertyName in propertyNames)
+		{
+			if (entity.TryGetValue(propertyName, out var value) && value is string stringValue)
+			{
+				return stringValue;
+			}
+		}
+
+		return null;
+	}
+
+	private static DateTimeOffset? GetDateTimeOffset(TableEntity entity, params string[] propertyNames)
+	{
+		foreach (var propertyName in propertyNames)
+		{
+			if (!entity.TryGetValue(propertyName, out var value))
+			{
+				continue;
+			}
+
+			if (value is DateTimeOffset dateTimeOffset)
+			{
+				return dateTimeOffset;
+			}
+
+			if (value is DateTime dateTime)
+			{
+				return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc));
+			}
+
+			if (value is string stringValue
+				&& DateTimeOffset.TryParse(stringValue, out var parsed))
+			{
+				return parsed;
+			}
+		}
+
+		return null;
 	}
 
 	private static string EscapeODataString(string value)
