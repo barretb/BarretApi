@@ -118,7 +118,7 @@ public sealed class NasaApodPostEndpoint_HandleAsync_Tests
 
         await _service.Received(1).PostAsync(
             Arg.Any<DateOnly?>(),
-            Arg.Is<IReadOnlyList<string>>(p => p.Contains("bluesky") && p.Contains("mastodon")),
+            Arg.Is<IReadOnlyList<string>>(p => p != null && p.Contains("bluesky") && p.Contains("mastodon")),
             Arg.Any<CancellationToken>());
     }
 

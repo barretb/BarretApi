@@ -118,6 +118,7 @@ public sealed class BlogPromotionOrchestrator_BuildReminderPostText_Tests
 
         await _platformClient.Received(1).PostAsync(
             Arg.Is<string>(text =>
+                text != null &&
                 text.Contains("...") &&
                 !text.Contains("\u2026")),
             Arg.Any<IReadOnlyList<UploadedImage>>(),

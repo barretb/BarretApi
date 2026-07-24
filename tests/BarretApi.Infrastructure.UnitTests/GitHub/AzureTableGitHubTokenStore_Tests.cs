@@ -37,6 +37,7 @@ public sealed class AzureTableGitHubTokenStore_Tests
 
         await _tableClient.Received(1).UpsertEntityAsync(
             Arg.Is<TableEntity>(e =>
+                e != null &&
                 e.PartitionKey == "github-tokens" &&
                 e.RowKey == "current" &&
                 e.GetString("AccessToken") == "ghp_abc123" &&

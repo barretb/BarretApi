@@ -80,7 +80,7 @@ using (var scaledLogo = logo.Resize(new SKImageInfo((int)logoW, (int)logoH), new
 {
 if (scaledLogo is not null)
 {
-canvas.DrawBitmap(scaledLogo, logoRect);
+canvas.DrawBitmap(scaledLogo, logoRect, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 }
 }
 
@@ -96,7 +96,7 @@ using (var scaledFace = face.Resize(new SKImageInfo((int)faceW, (int)faceH), new
 {
 if (scaledFace is not null)
 {
-canvas.DrawBitmap(scaledFace, faceRect);
+canvas.DrawBitmap(scaledFace, faceRect, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 }
 }
 
@@ -193,7 +193,7 @@ return;
 
 var srcRect = new SKRect(offsetX, offsetY, offsetX + targetWidth, offsetY + targetHeight);
 var destRect = SKRect.Create(0, 0, targetWidth, targetHeight);
-canvas.DrawBitmap(resized, srcRect, destRect);
+canvas.DrawBitmap(resized, srcRect, destRect, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 }
 
 private static (float width, float height) ScaleDimensionsToHeight(int sourceWidth, int sourceHeight, int targetHeight)

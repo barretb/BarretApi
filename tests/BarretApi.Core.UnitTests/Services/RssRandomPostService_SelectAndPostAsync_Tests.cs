@@ -168,7 +168,7 @@ public sealed class RssRandomPostService_SelectAndPostAsync_Tests
         await _sut.SelectAndPostAsync(query);
 
         await _mockClient.Received(1).PostAsync(
-            Arg.Is<string>(text => text.Contains("From the archives...") && text.Contains("My Great Post") && text.Contains("https://example.com/post-1")),
+            Arg.Is<string>(text => text != null && text.Contains("From the archives...") && text.Contains("My Great Post") && text.Contains("https://example.com/post-1")),
             Arg.Any<IReadOnlyList<UploadedImage>>(),
             Arg.Any<CancellationToken>());
     }
@@ -607,6 +607,7 @@ public sealed class RssRandomPostService_TagExclusion_Tests
         _hashtagService.Received().ProcessHashtags(
             Arg.Any<string>(),
             Arg.Is<IReadOnlyList<string>>(tags =>
+                tags != null &&
                 tags.Contains("dotnet") && tags.Contains("aspire") && tags.Count == 2));
     }
 
@@ -878,6 +879,7 @@ public sealed class RssRandomPostService_HeaderPrepend_Tests
 
         await _mockClient.Received(1).PostAsync(
             Arg.Is<string>(text =>
+                text != null &&
                 text.Contains("Check this out!") &&
                 text.Contains("From the archives...") &&
                 text.IndexOf("From the archives...", StringComparison.Ordinal) <
@@ -904,7 +906,7 @@ public sealed class RssRandomPostService_HeaderPrepend_Tests
 
         await _mockClient.Received(1).PostAsync(
             Arg.Is<string>(text =>
-                text.StartsWith("From the archives...", StringComparison.Ordinal)),
+                text != null && text.StartsWith("From the archives...", StringComparison.Ordinal)),
             Arg.Any<IReadOnlyList<UploadedImage>>(),
             Arg.Any<CancellationToken>());
     }
@@ -925,7 +927,7 @@ public sealed class RssRandomPostService_HeaderPrepend_Tests
 
         await _mockClient.Received(1).PostAsync(
             Arg.Is<string>(text =>
-                text.StartsWith("From the archives...", StringComparison.Ordinal)),
+                text != null && text.StartsWith("From the archives...", StringComparison.Ordinal)),
             Arg.Any<IReadOnlyList<UploadedImage>>(),
             Arg.Any<CancellationToken>());
     }

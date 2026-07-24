@@ -40,7 +40,7 @@ public sealed class NasaApodPostService_PostAsync_Tests
         hashtagService.ProcessHashtags(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>())
             .Returns(callInfo => new HashtagProcessingResult
             {
-                FinalText = callInfo.Arg<string>(),
+                FinalText = callInfo.Arg<string>()!,
                 AllHashtags = []
             });
 
@@ -156,7 +156,7 @@ public sealed class NasaApodPostService_PostAsync_Tests
             .Returns(callInfo =>
             {
                 capturedImage = callInfo.Arg<ImageData>();
-                return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage.AltText };
+                return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage!.AltText };
             });
 
         var result = await _sut.PostAsync(null, ["bluesky"], CancellationToken.None);
@@ -495,7 +495,7 @@ public sealed class NasaApodPostService_PostAsync_Tests
             .Returns(callInfo => new UploadedImage
             {
                 PlatformImageId = "img-1",
-                AltText = callInfo.Arg<ImageData>().AltText
+                AltText = callInfo.Arg<ImageData>()!.AltText
             });
         client.PostAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<UploadedImage>>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => new PlatformPostResult

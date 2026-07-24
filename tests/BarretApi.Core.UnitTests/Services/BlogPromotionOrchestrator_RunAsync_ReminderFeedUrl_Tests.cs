@@ -99,7 +99,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_ReminderFeedUrl_Tests
 
         result.ReminderPostsAttempted.ShouldBe(0);
         await _platformClient.DidNotReceive().PostAsync(
-            Arg.Is<string>(text => text.Contains("In case you missed it earlier")),
+            Arg.Is<string>(text => text != null && text.Contains("In case you missed it earlier")),
             Arg.Any<IReadOnlyList<UploadedImage>>(),
             Arg.Any<CancellationToken>());
     }
@@ -198,7 +198,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_ReminderFeedUrl_Tests
         await _sut.RunAsync();
 
         await _repository.Received(1).UpsertAsync(
-            Arg.Is<BlogPostPromotionRecord>(r => r.FeedUrl == ConfigFeedUrl),
+            Arg.Is<BlogPostPromotionRecord>(r => r != null && r.FeedUrl == ConfigFeedUrl),
             Arg.Any<CancellationToken>());
     }
 
@@ -218,7 +218,7 @@ public sealed class BlogPromotionOrchestrator_RunAsync_ReminderFeedUrl_Tests
         await _sut.RunAsync(feedUrl: customUrl);
 
         await _repository.Received(1).UpsertAsync(
-            Arg.Is<BlogPostPromotionRecord>(r => r.FeedUrl == customUrl),
+            Arg.Is<BlogPostPromotionRecord>(r => r != null && r.FeedUrl == customUrl),
             Arg.Any<CancellationToken>());
     }
 

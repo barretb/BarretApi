@@ -35,7 +35,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
         hashtagService.ProcessHashtags(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>())
             .Returns(callInfo => new HashtagProcessingResult
             {
-                FinalText = callInfo.Arg<string>(),
+                FinalText = callInfo.Arg<string>()!,
                 AllHashtags = []
             });
 
@@ -69,7 +69,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 
         result.Date.ShouldBe(yesterday);
         await _gibsClient.Received(1).GetSnapshotAsync(
-            Arg.Is<GibsSnapshotRequest>(r => r.Date == yesterday),
+            Arg.Is<GibsSnapshotRequest>(r => r != null && r.Date == yesterday),
             Arg.Any<CancellationToken>());
     }
 
@@ -82,7 +82,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
 
         result.Layer.ShouldBe(_options.DefaultLayer);
         await _gibsClient.Received(1).GetSnapshotAsync(
-            Arg.Is<GibsSnapshotRequest>(r => r.Layer == _options.DefaultLayer),
+            Arg.Is<GibsSnapshotRequest>(r => r != null && r.Layer == _options.DefaultLayer),
             Arg.Any<CancellationToken>());
     }
 
@@ -132,7 +132,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
             .Returns(callInfo =>
             {
                 capturedImage = callInfo.Arg<ImageData>();
-                return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage.AltText };
+                return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage!.AltText };
             });
 
         await _sut.PostAsync(date, layer, null, null, null, null, null, null, null, null, ["bluesky"], CancellationToken.None);
@@ -154,7 +154,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
             .Returns(callInfo =>
             {
                 capturedImage = callInfo.Arg<ImageData>();
-                return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage.AltText };
+                return new UploadedImage { PlatformImageId = "img1", AltText = capturedImage!.AltText };
             });
 
         await _sut.PostAsync(null, null, null, null, null, null, null, null, null, null, ["bluesky"], CancellationToken.None);
@@ -208,7 +208,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
         await _sut.PostAsync(date, null, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
         await _gibsClient.Received(1).GetSnapshotAsync(
-            Arg.Is<GibsSnapshotRequest>(r => r.Date == date),
+            Arg.Is<GibsSnapshotRequest>(r => r != null && r.Date == date),
             Arg.Any<CancellationToken>());
     }
 
@@ -245,7 +245,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
         await _sut.PostAsync(null, layer, null, null, null, null, null, null, null, null, [], CancellationToken.None);
 
         await _gibsClient.Received(1).GetSnapshotAsync(
-            Arg.Is<GibsSnapshotRequest>(r => r.Layer == layer),
+            Arg.Is<GibsSnapshotRequest>(r => r != null && r.Layer == layer),
             Arg.Any<CancellationToken>());
     }
 
@@ -302,7 +302,7 @@ public sealed class NasaGibsPostService_PostAsync_Tests
             .Returns(callInfo => new UploadedImage
             {
                 PlatformImageId = $"{platform}-img-1",
-                AltText = callInfo.Arg<ImageData>().AltText
+                AltText = callInfo.Arg<ImageData>()!.AltText
             });
         return client;
     }

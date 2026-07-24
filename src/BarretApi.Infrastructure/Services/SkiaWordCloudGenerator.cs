@@ -56,7 +56,7 @@ public sealed class SkiaWordCloudGenerator(
         using var final = new SKBitmap(options.Width, options.Height);
         using var canvas = new SKCanvas(final);
         canvas.Clear(SKColors.White);
-        canvas.DrawBitmap(wordBitmap, 0, 0);
+canvas.DrawBitmap(wordBitmap, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 
         using var data = final.Encode(SKEncodedImageFormat.Png, 100);
         var bytes = data.ToArray();

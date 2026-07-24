@@ -75,7 +75,7 @@ public sealed class GitHubRepoSyncEndpoint_Tests
 
         await _repoStore.Received(1).ReplaceAllAsync(
             "octocat",
-            Arg.Is<IReadOnlyList<GitHubRepositoryRecord>>(r => r.Count == 1),
+            Arg.Is<IReadOnlyList<GitHubRepositoryRecord>>(r => r != null && r.Count == 1),
             Arg.Any<CancellationToken>());
     }
 

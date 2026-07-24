@@ -53,6 +53,7 @@ public sealed class GitHubAuthCallbackEndpoint_Tests
 
         await _tokenStore.Received(1).SaveTokenAsync(
             Arg.Is<GitHubTokenRecord>(t =>
+                t != null &&
                 t.AccessToken == "ghp_save_test" &&
                 t.Username == "testuser"),
             Arg.Any<CancellationToken>());
