@@ -96,7 +96,7 @@ public sealed class SignboardPostService_PostAsync_Tests
 	[Fact]
 	public async Task AttachesPngWithDefaultAltText_GivenNoAltText()
 	{
-		var command = new SignboardGenerationCommand("LINE ONE\nLINE TWO", 1200, 900, 1);
+		var command = new SignboardGenerationCommand("Line One\nLine Two", 1200, 900, 1);
 
 		ImageData? capturedImage = null;
 		_blueskyClient.UploadImageAsync(Arg.Any<ImageData>(), Arg.Any<CancellationToken>())
@@ -111,7 +111,7 @@ public sealed class SignboardPostService_PostAsync_Tests
 		capturedImage.ShouldNotBeNull();
 		capturedImage!.ContentType.ShouldBe("image/png");
 		capturedImage.Content.ShouldBe(FakePng);
-		capturedImage.AltText.ShouldBe("Letterboard sign reading: LINE ONE LINE TWO");
+		capturedImage.AltText.ShouldBe("A signboard that reads: Line One Line Two");
 	}
 
 	[Fact]

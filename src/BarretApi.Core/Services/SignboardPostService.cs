@@ -29,10 +29,10 @@ public class SignboardPostService(
 
 		var imageBytes = await _signboardGenerator.GenerateAsync(command, cancellationToken);
 
-		var displayText = command.Text.ToUpperInvariant().ReplaceLineEndings(" ");
+		var displayText = command.Text.ReplaceLineEndings(" ");
 		var resolvedCaption = string.IsNullOrWhiteSpace(caption) ? command.Text : caption;
 		var resolvedAltText = string.IsNullOrWhiteSpace(altText)
-			? $"Letterboard sign reading: {displayText}"
+			? $"A signboard that reads: {displayText}"
 			: altText;
 
 		_logger.LogInformation(
