@@ -1350,7 +1350,7 @@ Renders text as a letterboard-style lightbox sign (white board, dark frame, tile
 | `platforms` | `string[]` | No | — | When present and non-empty, posts the image to `bluesky`, `mastodon`, and/or `linkedin` and returns JSON results instead of the PNG. |
 | `caption` | `string` | No | Sign text | Post body text when posting (max 1000 chars). |
 | `hashtags` | `string[]` | No | — | Hashtags appended when posting (no spaces, max 100 chars each). |
-| `altText` | `string` | No | Auto | Image alt text when posting (max 1500 chars). Defaults to `Letterboard sign reading: {text}` where `{text}` is the sign text uppercased with newlines replaced by spaces. |
+| `altText` | `string` | No | Auto | Image alt text when posting (max 1500 chars). Defaults to `A signboard that reads: {text}` where `{text}` is the sign text as passed in, with newlines replaced by spaces. |
 
 #### Example — Generate a PNG
 
@@ -1374,7 +1374,7 @@ POST /api/signboard
   "platforms": ["bluesky", "mastodon"],
   "caption": "New sign day!",
   "hashtags": ["signboard"],
-  "altText": "Letterboard sign reading: sorry we are open"
+  "altText": "A signboard that reads: sorry we are open"
 }
 ```
 

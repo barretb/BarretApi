@@ -54,7 +54,7 @@ As an API consumer, I want to optionally post the generated signboard image dire
 2. **Given** two platforms are targeted and one fails, **When** I submit the request, **Then** the system returns HTTP 207 with per-platform success/failure details, matching the behavior of the other posting endpoints.
 3. **Given** all targeted platforms fail, **When** I submit the request, **Then** the system returns HTTP 502 with per-platform error details.
 4. **Given** I supply a `caption`, **Then** the caption (plus any `hashtags`) is used as the post body text; **Given** I omit the caption, **Then** the sign text is used as the post body text.
-5. **Given** I omit `altText`, **Then** the image alt text defaults to "Letterboard sign reading: {text}".
+5. **Given** I omit `altText`, **Then** the image alt text defaults to "A signboard that reads: {text}".
 
 ---
 
@@ -84,7 +84,7 @@ As an API consumer, I want to optionally post the generated signboard image dire
 - **FR-009**: System MUST accept optional `width` and `height` (400–2000 px each, defaults 1200×900) and return a PNG of exactly those dimensions.
 - **FR-010**: When `platforms` is absent or empty, the system MUST return the raw PNG bytes with `Content-Type: image/png`.
 - **FR-011**: When `platforms` is present and non-empty, the system MUST post the generated image to the targeted platforms (`bluesky`, `mastodon`, `linkedin`) using the existing social posting services, and return a JSON response with per-platform results using the established 200/207/502 semantics.
-- **FR-012**: When posting, the post body text MUST be the supplied `caption` (falling back to the sign text) with any supplied `hashtags` appended; image alt text MUST be the supplied `altText` (falling back to "Letterboard sign reading: {text}").
+- **FR-012**: When posting, the post body text MUST be the supplied `caption` (falling back to the sign text) with any supplied `hashtags` appended; image alt text MUST be the supplied `altText` (falling back to "A signboard that reads: {text}").
 - **FR-013**: System MUST resize/re-encode the image as needed to satisfy per-platform image size limits, reusing the existing image resizing behavior used by other image-posting endpoints.
 - **FR-014**: System MUST use a bundled condensed sans-serif font with an open license (embedded resource), not a system-installed font.
 - **FR-015**: System MUST return appropriate error responses: 400 (validation), 401 (missing/invalid API key), 500 (rendering failure), 502 (all platforms failed).
