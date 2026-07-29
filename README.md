@@ -21,6 +21,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [GET /api/linkedin/auth/callback — LinkedIn OAuth Callback](#get-apilinkedinauthcallback--linkedin-oauth-callback)
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
   - [POST /api/word-cloud — Generate Word Cloud](#post-apiword-cloud--generate-word-cloud)
+  - [POST /api/signboard — Generate Signboard Image](#post-apisignboard--generate-signboard-image)
   - [GET /api/avatars/random — Generate Random Avatar](#get-apiavatarsrandom--generate-random-avatar)
   - [GET /api/github/auth — Initiate GitHub OAuth Flow](#get-apigithubauth--initiate-github-oauth-flow)
   - [GET /api/github/auth/callback — GitHub OAuth Callback](#get-apigithubauthcallback--github-oauth-callback)
@@ -1325,6 +1326,87 @@ curl -X POST http://localhost:5000/api/word-cloud \
 | Max words in cloud | 100 |
 | Min word length | 3 characters |
 | Image size range | 200×200 to 2000×2000 px |
+
+---
+
+### POST /api/signboard — Generate Signboard Image
+
+Renders text as a letterboard-style lightbox sign (white board, dark frame, tile letters with occasional red accents) and returns it as a PNG. When `platforms` is supplied, the image is instead posted to the targeted social platforms and a JSON result is returned.
+
+| Detail | Value |
+|---|---|
+| **Auth** | `X-Api-Key` header |
+| **Content-Type** | `application/json` |
+| **Response Content-Type** | `image/png` (generate-only) or `application/json` (posting mode) |
+
+#### Request Body
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `text` | `string` | Yes | — | Sign text (max 200 chars). Rendered uppercase. Newlines force line breaks; text auto-wraps otherwise. Supported characters: A–Z, 0–9, space, newline, and `! ? . , ' " & @ # $ % - + / : ;`. |
+| `width` | `integer` | No | `1200` | Image width in pixels (400–2000). |
+| `height` | `integer` | No | `900` | Image height in pixels (400–2000). |
+| `seed` | `integer` | No | Random | Same text + seed + dimensions produce byte-identical output. The seed used is echoed in the `X-Signboard-Seed` response header (PNG mode) or the `seed` field (JSON mode). |
+| `platforms` | `string[]` | No | — | When present and non-empty, posts the image to `bluesky`, `mastodon`, and/or `linkedin` and returns JSON results instead of the PNG. |
+| `caption` | `string` | No | Sign text | Post body text when posting (max 1000 chars). |
+| `hashtags` | `string[]` | No | — | Hashtags appended when posting (no spaces, max 100 chars each). |
+| `altText` | `string` | No | Auto | Image alt text when posting (max 1500 chars). Defaults to `Letterboard sign reading: {text}`. |
+
+#### Example — Generate a PNG
+
+```bash
+curl -X POST http://localhost:5000/api/signboard \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -d '{"text": "I USED TO THINK\nI WAS INDECISIVE\nBUT NOW\nI'\''M NOT SURE", "seed": 42}' \
+  --output signboard.png
+```
+
+#### Example — Generate and Post to Social Platforms
+
+```http
+POST /api/signboard
+```
+
+```json
+{
+  "text": "SORRY WE ARE OPEN",
+  "platforms": ["bluesky", "mastodon"],
+  "caption": "New sign day!",
+  "hashtags": ["signboard"],
+  "altText": "Letterboard sign reading: sorry we are open"
+}
+```
+
+#### Response — 200 OK (Posting Mode)
+
+```json
+{
+  "width": 1200,
+  "height": 900,
+  "seed": 42,
+  "results": [
+    {
+      "platform": "bluesky",
+      "success": true,
+      "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+      "postUrl": "https://bsky.app/profile/handle.bsky.social/post/xyz789"
+    }
+  ],
+  "postedAt": "2026-07-28T12:00:00+00:00"
+}
+```
+
+#### Status Codes
+
+| Code | Meaning |
+|---|---|
+| **200** | PNG generated (generate-only) or all targeted platforms succeeded (posting mode). |
+| **207** | Partial success — at least one platform succeeded and at least one failed. |
+| **400** | Request validation failed (missing/overlong text, unsupported characters, invalid dimensions or platform). |
+| **401** | Missing or invalid `X-Api-Key`. |
+| **500** | Unexpected error during image generation. |
+| **502** | All targeted platforms failed to post. |
 
 ---
 
