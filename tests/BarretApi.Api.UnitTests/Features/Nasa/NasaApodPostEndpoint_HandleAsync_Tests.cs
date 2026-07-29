@@ -30,7 +30,8 @@ public sealed class NasaApodPostEndpoint_HandleAsync_Tests
             Substitute.For<INasaApodClient>(),
             socialPostService,
             Substitute.For<IImageResizer>(),
-            Substitute.For<ILogger<NasaApodPostService>>());
+            Substitute.For<ILogger<NasaApodPostService>>(),
+            Substitute.For<IEmailNotificationService>());
     }
 
     private static ApodPostResult CreateSuccessResult(ApodEntry apod)
