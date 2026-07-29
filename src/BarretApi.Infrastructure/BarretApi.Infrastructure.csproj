@@ -8,6 +8,7 @@
 	<ItemGroup>
 		<EmbeddedResource Include="Fonts\JetBrainsMono-Bold.ttf" />
 		<EmbeddedResource Include="Fonts\JetBrainsMono-Regular.ttf" />
+		<EmbeddedResource Include="Fonts\Anton-Regular.ttf" />
 	</ItemGroup>
 
 	<ItemGroup>
