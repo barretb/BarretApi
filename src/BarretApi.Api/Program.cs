@@ -194,6 +194,9 @@ builder.Services.AddSingleton<IHtmlTextExtractor>(sp =>
 builder.Services.AddSingleton<IWordCloudGenerator, SkiaWordCloudGenerator>();
 builder.Services.AddSingleton<TextAnalysisService>();
 
+builder.Services.AddSingleton<ISignboardGenerator, SkiaSignboardGenerator>();
+builder.Services.AddSingleton<SignboardPostService>();
+
 builder.Services.Configure<GitHubOptions>(builder.Configuration.GetSection(GitHubOptions.SectionName));
 builder.Services.AddSingleton<IGitHubTokenStore, AzureTableGitHubTokenStore>();
 builder.Services.AddSingleton<IGitHubRepositoryStore, AzureTableGitHubRepositoryStore>();
