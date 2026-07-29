@@ -35,7 +35,8 @@ public sealed class SatellitePostEndpoint_HandleAsync_Tests
             Substitute.For<INasaGibsClient>(),
             socialPostService,
             options,
-            Substitute.For<ILogger<NasaGibsPostService>>());
+            Substitute.For<ILogger<NasaGibsPostService>>(),
+            Substitute.For<IEmailNotificationService>());
     }
 
     private static SatellitePostResult CreateSuccessResult()
