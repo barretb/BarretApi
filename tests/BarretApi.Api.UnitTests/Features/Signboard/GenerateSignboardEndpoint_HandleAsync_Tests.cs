@@ -6,6 +6,7 @@ using BarretApi.Core.Services;
 using FastEndpoints;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using Shouldly;
 
 namespace BarretApi.Api.UnitTests.Features.Signboard;
@@ -88,7 +89,38 @@ public sealed class GenerateSignboardEndpoint_HandleAsync_Tests
 		ep.Response.Results.Count.ShouldBe(1);
 		ep.Response.Results[0].Platform.ShouldBe("bluesky");
 		ep.Response.Results[0].Success.ShouldBeTrue();
+		ep.HttpContext.Response.StatusCode.ShouldBe(200);
 		await _generator.DidNotReceiveWithAnyArgs().GenerateAsync(default!, default);
+	}
+
+	[Fact]
+	public async Task Returns207_GivenPartialSuccess()
+	{
+		_postService.PostAsync(
+				Arg.Any<SignboardGenerationCommand>(),
+				Arg.Any<string?>(),
+				Arg.Any<IReadOnlyList<string>>(),
+				Arg.Any<string?>(),
+				Arg.Any<IReadOnlyList<string>>(),
+				Arg.Any<CancellationToken>())
+			.Returns(new SignboardPostResult(1200, 900, 42, true,
+			[
+				new PlatformPostResult { Platform = "bluesky", Success = true, PostId = "p1" },
+				new PlatformPostResult
+				{
+					Platform = "mastodon",
+					Success = false,
+					ErrorMessage = "Rate limit exceeded",
+					ErrorCode = "RATE_LIMITED"
+				}
+			]));
+
+		var ep = Factory.Create<GenerateSignboardEndpoint>(_generator, _postService, _logger);
+		var req = new GenerateSignboardRequest { Text = "HELLO", Platforms = ["bluesky", "mastodon"] };
+
+		await ep.HandleAsync(req, default);
+
+		ep.HttpContext.Response.StatusCode.ShouldBe(207);
 	}
 
 	[Fact]
@@ -120,5 +152,26 @@ public sealed class GenerateSignboardEndpoint_HandleAsync_Tests
 		ep.Response.Results[0].Success.ShouldBeFalse();
 		ep.Response.Results[0].Error.ShouldBe("Rate limit exceeded");
 		ep.Response.Results[0].ErrorCode.ShouldBe("RATE_LIMITED");
+		ep.HttpContext.Response.StatusCode.ShouldBe(502);
+	}
+
+	[Fact]
+	public async Task Returns500_GivenPostServiceThrows()
+	{
+		_postService.PostAsync(
+				Arg.Any<SignboardGenerationCommand>(),
+				Arg.Any<string?>(),
+				Arg.Any<IReadOnlyList<string>>(),
+				Arg.Any<string?>(),
+				Arg.Any<IReadOnlyList<string>>(),
+				Arg.Any<CancellationToken>())
+			.ThrowsAsync(new InvalidOperationException("boom"));
+
+		var ep = Factory.Create<GenerateSignboardEndpoint>(_generator, _postService, _logger);
+		var req = new GenerateSignboardRequest { Text = "HELLO", Platforms = ["bluesky"] };
+
+		await ep.HandleAsync(req, default);
+
+		ep.HttpContext.Response.StatusCode.ShouldBe(500);
 	}
 }

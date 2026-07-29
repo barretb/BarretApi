@@ -68,13 +68,24 @@ public sealed class GenerateSignboardEndpoint(
 			return;
 		}
 
-		var result = await _postService.PostAsync(
-			command,
-			req.Caption,
-			req.Hashtags ?? [],
-			req.AltText,
-			platforms,
-			ct);
+		SignboardPostResult result;
+		try
+		{
+			result = await _postService.PostAsync(
+				command,
+				req.Caption,
+				req.Hashtags ?? [],
+				req.AltText,
+				platforms,
+				ct);
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			_logger.LogError(ex, "Signboard generation failed");
+			AddError("An unexpected error occurred during image generation.");
+			await Send.ErrorsAsync(500, ct);
+			return;
+		}
 
 		var response = new GenerateSignboardResponse
 		{

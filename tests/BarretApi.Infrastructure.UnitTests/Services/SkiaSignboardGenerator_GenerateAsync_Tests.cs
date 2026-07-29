@@ -100,6 +100,85 @@ public sealed class SkiaSignboardGenerator_GenerateAsync_Tests
 		bitmap.Height.ShouldBe(400);
 	}
 
+	[Fact]
+	public async Task NeverPaintsOutsideBoardFace_GivenSingleOverWideWord()
+	{
+		// 60 x 'W' with no spaces: a single word wider than the board face at any
+		// reasonable font size. Must be hard-broken mid-word rather than overflowing.
+		var text = new string('W', 60);
+		var command = new SignboardGenerationCommand(text, 400, 400, 11);
+
+		var result = await _sut.GenerateAsync(command);
+
+		using var bitmap = SKBitmap.Decode(result);
+		AssertNoInkOutsideFrameBand(bitmap);
+	}
+
+	[Fact]
+	public async Task NeverPaintsOutsideBoardFace_GivenTooManyForcedLineBreaks()
+	{
+		// 60 explicit newline-separated single-character lines: forces far more rows
+		// than fit at any font size down to the old floor, which used to push
+		// gridTop negative and render rows off the top of the canvas.
+		var text = string.Join('\n', Enumerable.Repeat("X", 60));
+		var command = new SignboardGenerationCommand(text, 1200, 900, 17);
+
+		var result = await _sut.GenerateAsync(command);
+
+		using var bitmap = SKBitmap.Decode(result);
+		AssertNoInkOutsideFrameBand(bitmap);
+	}
+
+	[Fact]
+	public async Task NeverPaintsOutsideBoardFace_GivenTooManyForcedLineBreaksOnSmallCanvas()
+	{
+		var text = string.Join('\n', Enumerable.Repeat("X", 26));
+		var command = new SignboardGenerationCommand(text, 400, 400, 23);
+
+		var result = await _sut.GenerateAsync(command);
+
+		using var bitmap = SKBitmap.Decode(result);
+		AssertNoInkOutsideFrameBand(bitmap);
+	}
+
+	/// <summary>
+	/// The outermost few pixels on every edge belong to the dark board frame,
+	/// regardless of text content. Any pixel there that isn't dark means text (or
+	/// tile artwork) painted outside the board face and got clipped by the canvas.
+	/// </summary>
+	private static void AssertNoInkOutsideFrameBand(SKBitmap bitmap)
+	{
+		const int band = 4;
+		const byte maxDarkChannel = 80;
+
+		void AssertFrame(int x, int y)
+		{
+			var pixel = bitmap.GetPixel(x, y);
+			var isFrameColor = pixel.Red < maxDarkChannel && pixel.Green < maxDarkChannel && pixel.Blue < maxDarkChannel;
+			isFrameColor.ShouldBeTrue($"Expected frame color at ({x},{y}) but found R={pixel.Red} G={pixel.Green} B={pixel.Blue}");
+		}
+
+		// Top and bottom bands, full width.
+		for (var x = 0; x < bitmap.Width; x++)
+		{
+			for (var y = 0; y < band; y++)
+			{
+				AssertFrame(x, y);
+				AssertFrame(x, bitmap.Height - 1 - y);
+			}
+		}
+
+		// Left and right bands, full height.
+		for (var y = 0; y < bitmap.Height; y++)
+		{
+			for (var x = 0; x < band; x++)
+			{
+				AssertFrame(x, y);
+				AssertFrame(bitmap.Width - 1 - x, y);
+			}
+		}
+	}
+
 	private static bool IsPng(byte[] bytes)
 	{
 		return bytes.Length > 8

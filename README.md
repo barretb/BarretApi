@@ -1350,7 +1350,7 @@ Renders text as a letterboard-style lightbox sign (white board, dark frame, tile
 | `platforms` | `string[]` | No | — | When present and non-empty, posts the image to `bluesky`, `mastodon`, and/or `linkedin` and returns JSON results instead of the PNG. |
 | `caption` | `string` | No | Sign text | Post body text when posting (max 1000 chars). |
 | `hashtags` | `string[]` | No | — | Hashtags appended when posting (no spaces, max 100 chars each). |
-| `altText` | `string` | No | Auto | Image alt text when posting (max 1500 chars). Defaults to `Letterboard sign reading: {text}`. |
+| `altText` | `string` | No | Auto | Image alt text when posting (max 1500 chars). Defaults to `Letterboard sign reading: {text}` where `{text}` is the sign text uppercased with newlines replaced by spaces. |
 
 #### Example — Generate a PNG
 
@@ -1391,6 +1391,12 @@ POST /api/signboard
       "success": true,
       "postId": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
       "postUrl": "https://bsky.app/profile/handle.bsky.social/post/xyz789"
+    },
+    {
+      "platform": "mastodon",
+      "success": true,
+      "postId": "109876543210",
+      "postUrl": "https://mastodon.social/@you/109876543210"
     }
   ],
   "postedAt": "2026-07-28T12:00:00+00:00"

@@ -28,7 +28,7 @@ public sealed class SkiaSignboardGenerator(ILogger<SkiaSignboardGenerator> logge
 	private const float RowSpacingFactor = 1.5f;
 	private const float BaselineFactor = 0.36f;
 	private const float FontStep = 2f;
-	private const float MinFontSize = 10f;
+	private const float MinFontSize = 4f;
 	private const float MaxJitterDegrees = 1.6f;
 	private const float MaxJitterOffsetRatio = 0.035f;
 
@@ -76,11 +76,18 @@ public sealed class SkiaSignboardGenerator(ILogger<SkiaSignboardGenerator> logge
 		var (fontSize, lines) = FitText(segments, typeface, textArea);
 		var slotHeight = fontSize * RowSpacingFactor;
 
-		var slotCount = Math.Max(lines.Count, (int)(textArea.Height / slotHeight));
+		// Last-resort safety net: even after FitText's shrink-to-fit loop, guard against
+		// a degenerate case where the wrapped line count still exceeds what the text area
+		// can hold. Clamp the rendered rows to the available capacity so the grid (and
+		// gridTop) can never extend above the text area and off the top of the canvas.
+		var slotCapacity = Math.Max(1, (int)(textArea.Height / slotHeight));
+		var renderedLines = lines.Count > slotCapacity ? lines.Take(slotCapacity).ToList() : lines;
+
+		var slotCount = Math.Max(renderedLines.Count, slotCapacity);
 		var gridTop = textArea.MidY - slotCount * slotHeight / 2f;
 
 		DrawTrackLines(canvas, boardFace, gridTop, slotHeight, slotCount);
-		DrawLetterRows(canvas, lines, typeface, fontSize, gridTop, slotHeight, slotCount, textArea, random);
+		DrawLetterRows(canvas, renderedLines, typeface, fontSize, gridTop, slotHeight, slotCount, textArea, random);
 		DrawInnerShadow(canvas, boardFace, frame);
 
 		using var image = surface.Snapshot();
@@ -145,16 +152,45 @@ public sealed class SkiaSignboardGenerator(ILogger<SkiaSignboardGenerator> logge
 
 			foreach (var word in segment.Split(' ', StringSplitOptions.RemoveEmptyEntries))
 			{
-				var candidate = current.Length == 0 ? word : $"{current} {word}";
-
-				if (MeasureLine(candidate, font) <= maxWidth || current.Length == 0)
+				if (MeasureLine(word, font) <= maxWidth)
 				{
-					current = candidate;
+					var candidate = current.Length == 0 ? word : $"{current} {word}";
+
+					if (MeasureLine(candidate, font) <= maxWidth || current.Length == 0)
+					{
+						current = candidate;
+						continue;
+					}
+
+					lines.Add(current);
+					current = word;
 					continue;
 				}
 
-				lines.Add(current);
-				current = word;
+				// The word alone is wider than the board face (e.g. one very long run of
+				// characters with no spaces). Hard-break it mid-word into chunks that each
+				// fit maxWidth, flushing whatever line is already in progress first. Chunks
+				// are concatenated with no separator so the word reconstructs exactly.
+				var chunks = SplitOversizedWord(word, font, maxWidth).ToList();
+
+				for (var i = 0; i < chunks.Count; i++)
+				{
+					if (current.Length > 0)
+					{
+						lines.Add(current);
+						current = string.Empty;
+					}
+
+					var isLastChunk = i == chunks.Count - 1;
+					if (isLastChunk)
+					{
+						current = chunks[i];
+					}
+					else
+					{
+						lines.Add(chunks[i]);
+					}
+				}
 			}
 
 			if (current.Length > 0)
@@ -164,6 +200,42 @@ public sealed class SkiaSignboardGenerator(ILogger<SkiaSignboardGenerator> logge
 		}
 
 		return lines;
+	}
+
+	/// <summary>
+	/// Splits <paramref name="word"/> into the fewest chunks that each measure within
+	/// <paramref name="maxWidth"/>, cutting mid-word (no hyphenation) as a last resort.
+	/// Returns the word unchanged as a single chunk when it already fits.
+	/// </summary>
+	private static IEnumerable<string> SplitOversizedWord(string word, SKFont font, float maxWidth)
+	{
+		if (MeasureLine(word, font) <= maxWidth)
+		{
+			yield return word;
+			yield break;
+		}
+
+		var chunk = string.Empty;
+
+		foreach (var c in word)
+		{
+			var candidate = chunk + c;
+
+			if (chunk.Length > 0 && MeasureLine(candidate, font) > maxWidth)
+			{
+				yield return chunk;
+				chunk = c.ToString();
+			}
+			else
+			{
+				chunk = candidate;
+			}
+		}
+
+		if (chunk.Length > 0)
+		{
+			yield return chunk;
+		}
 	}
 
 	private static float MeasureLine(string line, SKFont font)
@@ -263,13 +335,14 @@ public sealed class SkiaSignboardGenerator(ILogger<SkiaSignboardGenerator> logge
 
 	private static void DrawInnerShadow(SKCanvas canvas, SKRect boardFace, float frame)
 	{
+		using var maskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, frame * 0.6f);
 		using var shadowPaint = new SKPaint
 		{
 			Color = new SKColor(0x00, 0x00, 0x00, 40),
 			IsAntialias = true,
 			IsStroke = true,
 			StrokeWidth = frame * 0.9f,
-			MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, frame * 0.6f)
+			MaskFilter = maskFilter
 		};
 
 		canvas.Save();
