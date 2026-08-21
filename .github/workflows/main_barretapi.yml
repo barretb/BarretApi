@@ -1,3 +1,9 @@
+# Builds and deploys the API on the self-hosted runner registered to this repo
+# (barretapi-actions-runner, defined in C:\projects\RunBarretRun\compose.yaml).
+#
+# The runner only picks up jobs while its container is running. A push still
+# queues a run if the machine is off, but it expires after ~24h.
+#
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
@@ -6,6 +12,9 @@ name: Build and deploy ASP.Net Core app to Azure Web App - barretapi
 env:
   API_PROJECT_PATH: src/BarretApi.Api/BarretApi.Api.csproj
   PUBLISH_PATH: ${{ github.workspace }}/publish
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
 
 on:
   push:
@@ -13,11 +22,21 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  # Build and deploy were separate jobs so the publish output could cross
+  # between two GitHub-hosted runners as an artifact. Both halves now run on the
+  # same machine, so the upload/download round-trip is pure overhead — one job
+  # keeps the publish output on disk and hands it straight to the deploy step.
+  build_and_deploy:
+    runs-on: [self-hosted, Linux, X64, barretapi]
+    timeout-minutes: 20
     permissions:
-      contents: read #This is required for actions/checkout
+      id-token: write # Required for requesting the OIDC JWT used by azure/login
+      contents: read # Required for actions/checkout
 
     steps:
       - uses: actions/checkout@v4
@@ -33,29 +52,14 @@ jobs:
       - name: Build API project
         run: dotnet build ${{ env.API_PROJECT_PATH }} --configuration Release --no-restore
 
+      # --cleanDestinationDir has no dotnet equivalent and the runner workspace
+      # persists between runs, so clear stale output rather than publishing over
+      # the top of a previous run's files.
       - name: Publish API project
-        run: dotnet publish ${{ env.API_PROJECT_PATH }} --configuration Release --no-build --output ${{ env.PUBLISH_PATH }}
+        run: |
+          rm -rf "${{ env.PUBLISH_PATH }}"
+          dotnet publish ${{ env.API_PROJECT_PATH }} --configuration Release --no-build --output ${{ env.PUBLISH_PATH }}
 
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
-        with:
-          name: .net-app
-          path: ${{ env.PUBLISH_PATH }}
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
-
-    steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: .net-app
-          path: ${{ github.workspace }}/.net-app
-      
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -69,5 +73,4 @@ jobs:
         with:
           app-name: 'barretapi'
           slot-name: 'Production'
-          package: ${{ github.workspace }}/.net-app
-          
+          package: ${{ env.PUBLISH_PATH }}
