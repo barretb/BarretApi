@@ -117,7 +117,7 @@ public sealed class AzureTableScheduledJobRepository : IScheduledJobRepository
             TableUpdateMode.Replace,
             cancellationToken);
 
-        job.ETag = TryGetETag(response) ?? job.ETag;
+        job.ETag = response?.Headers.ETag?.ToString() ?? job.ETag;
     }
 
     public async Task<bool> TryClaimAsync(
@@ -130,6 +130,7 @@ public sealed class AzureTableScheduledJobRepository : IScheduledJobRepository
 
         var previousState = job.RunState;
         var previousClaimedAt = job.ClaimedAtUtc;
+        var previousUpdatedAt = job.UpdatedAtUtc;
 
         job.RunState = JobRunState.Running;
         job.ClaimedAtUtc = nowUtc;
@@ -143,7 +144,7 @@ public sealed class AzureTableScheduledJobRepository : IScheduledJobRepository
                 TableUpdateMode.Replace,
                 cancellationToken);
 
-            job.ETag = TryGetETag(response) ?? job.ETag;
+            job.ETag = response?.Headers.ETag?.ToString() ?? job.ETag;
             return true;
         }
         catch (RequestFailedException ex) when (ex.Status == 412)
@@ -151,6 +152,7 @@ public sealed class AzureTableScheduledJobRepository : IScheduledJobRepository
             _logger.LogInformation("Claim for job {JobName} was lost to a concurrent writer.", job.Name);
             job.RunState = previousState;
             job.ClaimedAtUtc = previousClaimedAt;
+            job.UpdatedAtUtc = previousUpdatedAt;
             return false;
         }
     }
@@ -224,30 +226,6 @@ public sealed class AzureTableScheduledJobRepository : IScheduledJobRepository
         => value is not null && value.Length > maxLength ? value[..maxLength] : value;
 
     private static string EscapeODataString(string value) => value.Replace("'", "''");
-
-    /// <summary>
-    /// A substituted <see cref="TableClient"/> in unit tests returns a non-null
-    /// <see cref="Response"/> proxy with uninitialized internal state; reading
-    /// <c>Headers.ETag</c> on it throws <see cref="NullReferenceException"/> rather than
-    /// returning null. Treat that the same as "no ETag available" instead of letting it
-    /// bubble up. Against real storage, <c>Headers.ETag</c> never throws.
-    /// </summary>
-    private static string? TryGetETag(Response? response)
-    {
-        if (response is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return response.Headers.ETag?.ToString();
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)
     {

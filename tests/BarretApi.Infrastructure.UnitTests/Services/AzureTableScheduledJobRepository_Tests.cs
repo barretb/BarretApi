@@ -3,6 +3,7 @@ using Azure.Data.Tables;
 using BarretApi.Core.Configuration;
 using BarretApi.Core.Models;
 using BarretApi.Infrastructure.Services;
+using BarretApi.Infrastructure.UnitTests.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -80,6 +81,16 @@ public sealed class AzureTableScheduledJobRepository_Tests
                 Arg.Any<string>(),
                 cancellationToken: Arg.Any<CancellationToken>())
             .Returns(pageable);
+    }
+
+    private void SetUpdateResult(string eTag)
+    {
+        _tableClient.UpdateEntityAsync(
+                Arg.Any<TableEntity>(),
+                Arg.Any<ETag>(),
+                Arg.Any<TableUpdateMode>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new FakeResponse(eTag));
     }
 
     private static async IAsyncEnumerator<T> AsyncEnumeratorOf<T>(params T[] items)
@@ -182,6 +193,7 @@ public sealed class AzureTableScheduledJobRepository_Tests
     [Fact]
     public async Task TryClaimAsync_MarksTheJobRunning_GivenTheUpdateSucceeds()
     {
+        SetUpdateResult("etag-2");
         var job = CreateJob();
 
         var claimed = await CreateSut().TryClaimAsync(job, Now);
@@ -189,11 +201,14 @@ public sealed class AzureTableScheduledJobRepository_Tests
         claimed.ShouldBeTrue();
         job.RunState.ShouldBe(JobRunState.Running);
         job.ClaimedAtUtc.ShouldBe(Now);
+        job.ETag.ShouldBe("etag-2");
     }
 
     [Fact]
     public async Task TryClaimAsync_UsesTheRecordsETagForConcurrency()
     {
+        SetUpdateResult("etag-2");
+
         await CreateSut().TryClaimAsync(CreateJob(), Now);
 
         await _tableClient.Received(1).UpdateEntityAsync(
@@ -213,11 +228,13 @@ public sealed class AzureTableScheduledJobRepository_Tests
                 Arg.Any<CancellationToken>())
             .ThrowsAsync(new RequestFailedException(412, "precondition failed"));
         var job = CreateJob();
+        job.UpdatedAtUtc = Now.AddMinutes(-45);
 
         var claimed = await CreateSut().TryClaimAsync(job, Now);
 
         claimed.ShouldBeFalse();
         job.RunState.ShouldBe(JobRunState.Idle);
+        job.UpdatedAtUtc.ShouldBe(Now.AddMinutes(-45));
     }
 
     [Fact]
@@ -236,6 +253,8 @@ public sealed class AzureTableScheduledJobRepository_Tests
     [Fact]
     public async Task UpdateAsync_ReplacesUnconditionally()
     {
+        SetUpdateResult("etag-2");
+
         await CreateSut().UpdateAsync(CreateJob());
 
         await _tableClient.Received(1).UpdateEntityAsync(
