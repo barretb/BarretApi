@@ -17,6 +17,15 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [POST /api/social-posts/tips/post — Post Tip of the Day](#post-apisocial-poststipspost--post-tip-of-the-day)
   - [POST /api/social-posts/nasa-apod — Post NASA APOD to Social Platforms](#post-apisocial-postsnasa-apod--post-nasa-apod-to-social-platforms)
   - [POST /api/social-posts/satellite — Post Satellite Image](#post-apisocial-postssatellite--post-satellite-image)
+  - [Job Scheduler](#job-scheduler)
+    - [GET /api/jobs — List Scheduled Jobs](docs/JOB_SCHEDULER.md#get-apijobs--list-scheduled-jobs)
+    - [GET /api/jobs/{name} — Get a Scheduled Job](docs/JOB_SCHEDULER.md#get-apijobsname--get-a-scheduled-job)
+    - [POST /api/jobs — Create a Scheduled Job](docs/JOB_SCHEDULER.md#post-apijobs--create-a-scheduled-job)
+    - [PUT /api/jobs/{name} — Update a Scheduled Job](docs/JOB_SCHEDULER.md#put-apijobsname--update-a-scheduled-job)
+    - [DELETE /api/jobs/{name} — Delete a Scheduled Job](docs/JOB_SCHEDULER.md#delete-apijobsname--delete-a-scheduled-job)
+    - [POST /api/jobs/{name}/run — Run a Job Immediately](docs/JOB_SCHEDULER.md#post-apijobsnamerun--run-a-job-immediately)
+    - [GET /api/jobs/{name}/runs — List a Job's Run History](docs/JOB_SCHEDULER.md#get-apijobsnameruns--list-a-jobs-run-history)
+    - [GET /api/jobs/types — List Registered Job Types](docs/JOB_SCHEDULER.md#get-apijobstypes--list-registered-job-types)
   - [GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow](#get-apilinkedinauth--initiate-linkedin-oauth-flow)
   - [GET /api/linkedin/auth/callback — LinkedIn OAuth Callback](#get-apilinkedinauthcallback--linkedin-oauth-callback)
   - [GET /api/linkedin/profile — Get LinkedIn Profile](#get-apilinkedinprofile--get-linkedin-profile)
@@ -1109,6 +1118,18 @@ All GIBS parameters have sensible defaults and are configured in the Aspire AppH
 | **401** | Missing or invalid `X-Api-Key`. |
 | **422** | NASA GIBS returned an error or the snapshot could not be fetched. |
 | **502** | All targeted platforms failed. |
+
+---
+
+### Job Scheduler
+
+BarretApi can run its own recurring jobs instead of relying on Power Automate to call these endpoints on a timer. Job definitions live in Azure Table Storage and are fully managed over `/api/jobs*` — create, update, pause, delete, and trigger a run by hand, all without a redeploy. A background tick loop dispatches due jobs to handlers that wrap the same services the `/api/social-posts/*` endpoints above already call, retries failures with backoff, and keeps a durable run history.
+
+`JobScheduler:Enabled` defaults to `false`, so a local `dotnet run` never fires real posts. The Power Automate flows that currently drive this scheduled work are being retired in favor of this scheduler; during the migration, both triggers call the same underlying services, so a flow and its equivalent job can run side by side, and either can be paused independently with no code change.
+
+See **[docs/JOB_SCHEDULER.md](docs/JOB_SCHEDULER.md)** for the full endpoint reference, job-type arguments, cron/time-zone rules, configuration table, and the migration guide.
+
+> **Production prerequisite:** the `barretapi` Azure Web App must have **Always On** enabled, or App Service unloads the process when idle and the tick loop stops. See [Job Scheduler Configuration](#job-scheduler-configuration) in Production Notes.
 
 ---
 
@@ -2226,6 +2247,20 @@ Each feature uses its own table name (`linkedintokens`, `blogpostpromotions`, `s
 If scheduled-post requests fail with a table initialization error, verify `ScheduledSocialPost__TableStorage__TableName` is lowercase alphanumeric (example: `scheduledsocialposts`) and restart the app after updating app settings.
 
 Some production environments restrict table creation at runtime. In that case, pre-create the scheduled-post table and grant the app identity table data-plane permissions before calling scheduled endpoints.
+
+### Job Scheduler Configuration
+
+Before enabling the scheduler in production, ensure **at least one** of the following is configured:
+- `JobScheduler__TableStorage__ConnectionString` — can reuse your existing Azure Storage account (same as LinkedIn, Blog Promotion, or Scheduled Posts if using one storage account).
+- `JobScheduler__TableStorage__AccountEndpoint` — set to your table storage account endpoint and configure managed identity. This option is not wired to an AppHost parameter; set it directly as an Azure App Service application setting.
+
+The scheduler uses two tables, both configurable and defaulting to lowercase names: `scheduledjobs` (`JobScheduler__TableStorage__JobsTableName`) for job definitions and `jobruns` (`JobScheduler__TableStorage__RunsTableName`) for run history.
+
+**Unified Storage Pattern:** as with the other table-storage features, you can point `JobScheduler__TableStorage__ConnectionString` at the same storage account used everywhere else in this app — each feature uses its own table name, so there's no conflict.
+
+**Always On:** the `barretapi` Web App must have **Always On** enabled before any job is turned on in production. Without it, App Service unloads the process when idle and the background tick loop stops — jobs simply stop firing, silently, until the next request happens to wake the app. This is a portal setting (Web App → Configuration → General settings), not something set in code or the AppHost.
+
+The Power Automate flows this scheduler replaces are being retired incrementally; see [`docs/JOB_SCHEDULER.md`](docs/JOB_SCHEDULER.md#migrating-from-power-automate) for the migration sequence. Both triggers call the same services, so a flow and its equivalent job can coexist safely during cutover.
 
 ### LinkedIn Rollout Checklist
 
