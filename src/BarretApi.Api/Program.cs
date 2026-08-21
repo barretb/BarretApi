@@ -146,6 +146,7 @@ builder.Services.AddSingleton<IScheduledJobHandler, SatelliteJobHandler>();
 builder.Services.AddSingleton<IScheduledJobHandler, PurgeJobRunsJobHandler>();
 builder.Services.AddSingleton<JobHandlerRegistry>();
 builder.Services.AddSingleton<JobDispatcher>();
+builder.Services.AddSingleton<BuiltInJobSeeder>();
 builder.Services.AddHostedService<JobSchedulerHostedService>();
 builder.Services.AddSingleton<IEmailRateLimiter>(sp =>
 {
@@ -251,6 +252,11 @@ var app = builder.Build();
 // use. Resolving it here forces its constructor to run at startup, so a duplicate or blank
 // JobType fails the app at boot instead of on the first tick or the first /api/jobs request.
 app.Services.GetRequiredService<JobHandlerRegistry>();
+
+// Seeds the built-in purge-job-runs definition if it is missing. Never overwrites an
+// existing row, so a paused or retuned job survives a restart. Storage failures are
+// swallowed inside SeedAsync so the API still starts.
+await app.Services.GetRequiredService<BuiltInJobSeeder>().SeedAsync();
 
 app.UseCors();
 app.UseAuthentication();
