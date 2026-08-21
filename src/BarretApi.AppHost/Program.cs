@@ -39,6 +39,13 @@ var gibsBboxNorth = builder.AddParameter("gibs-bbox-north");
 var gibsBboxEast = builder.AddParameter("gibs-bbox-east");
 var gibsImageWidth = builder.AddParameter("gibs-image-width");
 var gibsImageHeight = builder.AddParameter("gibs-image-height");
+var jobSchedulerEnabled = builder.AddParameter("job-scheduler-enabled");
+var jobSchedulerTickIntervalSeconds = builder.AddParameter("job-scheduler-tick-interval-seconds");
+var jobSchedulerClaimTimeoutMinutes = builder.AddParameter("job-scheduler-claim-timeout-minutes");
+var jobSchedulerRunRetentionDays = builder.AddParameter("job-scheduler-run-retention-days");
+var jobSchedulerJobsTableName = builder.AddParameter("job-scheduler-jobs-table-name");
+var jobSchedulerRunsTableName = builder.AddParameter("job-scheduler-runs-table-name");
+var jobSchedulerPartitionKey = builder.AddParameter("job-scheduler-partition-key");
 
 var azurite = builder.AddContainer("azurite", "mcr.microsoft.com/azure-storage/azurite")
     .WithArgs("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0")
@@ -97,6 +104,14 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("GitHub__TokenStorage__ConnectionString", azuriteConnectionString)
     .WithEnvironment("GitHub__TokenStorage__TableName", gitHubTokenStorageTableName)
     .WithEnvironment("GitHub__RepoStorage__ConnectionString", azuriteConnectionString)
-    .WithEnvironment("GitHub__RepoStorage__TableName", gitHubRepoStorageTableName);
+    .WithEnvironment("GitHub__RepoStorage__TableName", gitHubRepoStorageTableName)
+    .WithEnvironment("JobScheduler__Enabled", jobSchedulerEnabled)
+    .WithEnvironment("JobScheduler__TickIntervalSeconds", jobSchedulerTickIntervalSeconds)
+    .WithEnvironment("JobScheduler__ClaimTimeoutMinutes", jobSchedulerClaimTimeoutMinutes)
+    .WithEnvironment("JobScheduler__RunRetentionDays", jobSchedulerRunRetentionDays)
+    .WithEnvironment("JobScheduler__TableStorage__ConnectionString", azuriteConnectionString)
+    .WithEnvironment("JobScheduler__TableStorage__JobsTableName", jobSchedulerJobsTableName)
+    .WithEnvironment("JobScheduler__TableStorage__RunsTableName", jobSchedulerRunsTableName)
+    .WithEnvironment("JobScheduler__TableStorage__PartitionKey", jobSchedulerPartitionKey);
 
 builder.Build().Run();

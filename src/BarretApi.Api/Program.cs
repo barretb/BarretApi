@@ -1,9 +1,11 @@
 using BarretApi.Api.Auth;
+using BarretApi.Api.Scheduling;
 using BarretApi.Api.Validation;
 using BarretApi.Core.Configuration;
 using BarretApi.Core.Interfaces;
 using BarretApi.Core.Models;
 using BarretApi.Core.Services;
+using BarretApi.Core.Services.Jobs;
 using BarretApi.Infrastructure.Bluesky;
 using BarretApi.Infrastructure.DiceBear;
 using BarretApi.Infrastructure.GitHub;
@@ -58,6 +60,12 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<TipOfDayOptions>>(
     new OptionsValidatorAdapter<TipOfDayOptions>(o => o.Validate()));
+builder.Services
+    .AddOptions<JobSchedulerOptions>()
+    .Bind(builder.Configuration.GetSection(JobSchedulerOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<JobSchedulerOptions>>(
+    new OptionsValidatorAdapter<JobSchedulerOptions>(o => o.Validate()));
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 
@@ -126,6 +134,19 @@ builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPr
 builder.Services.AddSingleton<IScheduledSocialPostRepository, AzureTableScheduledSocialPostRepository>();
 builder.Services.AddSingleton<IScheduledPostImageStore, AzureBlobScheduledPostImageStore>();
 builder.Services.AddSingleton<ITipOfDayRepository, AzureTableTipOfDayRepository>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IScheduledJobRepository, AzureTableScheduledJobRepository>();
+builder.Services.AddSingleton<IJobRunRepository, AzureTableJobRunRepository>();
+builder.Services.AddSingleton<IScheduledJobHandler, ProcessScheduledPostsJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, RssPromotionJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, RssRandomJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, TipOfDayJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, NasaApodJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, SatelliteJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, PurgeJobRunsJobHandler>();
+builder.Services.AddSingleton<JobHandlerRegistry>();
+builder.Services.AddSingleton<JobDispatcher>();
+builder.Services.AddHostedService<JobSchedulerHostedService>();
 builder.Services.AddSingleton<IEmailRateLimiter>(sp =>
 {
     var useAzureStorage = !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:ConnectionString"])
@@ -225,6 +246,11 @@ builder.Services.Configure<HeroImageOptions>(o =>
 builder.Services.AddScoped<IHeroImageGenerator, SkiaHeroImageGenerator>();
 
 var app = builder.Build();
+
+// JobHandlerRegistry is registered as a singleton, so it is normally built lazily on first
+// use. Resolving it here forces its constructor to run at startup, so a duplicate or blank
+// JobType fails the app at boot instead of on the first tick or the first /api/jobs request.
+app.Services.GetRequiredService<JobHandlerRegistry>();
 
 app.UseCors();
 app.UseAuthentication();

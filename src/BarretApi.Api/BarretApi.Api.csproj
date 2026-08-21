@@ -16,4 +16,8 @@
 		<ProjectReference Include="..\BarretApi.ServiceDefaults\BarretApi.ServiceDefaults.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="BarretApi.Api.UnitTests" />
+	</ItemGroup>
+
 </Project>
