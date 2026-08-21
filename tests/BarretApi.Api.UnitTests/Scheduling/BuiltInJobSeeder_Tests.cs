@@ -1,7 +1,7 @@
 using BarretApi.Api.Scheduling;
 using BarretApi.Core.Interfaces;
 using BarretApi.Core.Models;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Shouldly;
@@ -13,10 +13,25 @@ public sealed class BuiltInJobSeeder_Tests
     private static readonly DateTimeOffset Now = new(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
 
     private readonly IScheduledJobRepository _jobRepository = Substitute.For<IScheduledJobRepository>();
+    private readonly ILogger<BuiltInJobSeeder> _logger = Substitute.For<ILogger<BuiltInJobSeeder>>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
     private BuiltInJobSeeder CreateSut()
-        => new(_jobRepository, _timeProvider, NullLogger<BuiltInJobSeeder>.Instance);
+        => new(_jobRepository, _timeProvider, _logger);
+
+    /// <summary>
+    /// NSubstitute cannot match <see cref="ILogger.Log{TState}"/> directly by generic type
+    /// argument (the extension methods close it over an internal formatting type), so this
+    /// inspects the recorded calls instead: argument 0 is the <see cref="LogLevel"/> and
+    /// argument 2 is the state, whose ToString() is the formatted message.
+    /// </summary>
+    private bool LoggedAt(LogLevel level, string messageContains)
+        => _logger.ReceivedCalls().Any(call =>
+            call.GetMethodInfo().Name == nameof(ILogger.Log)
+            && call.GetArguments()[0] is LogLevel loggedLevel
+            && loggedLevel == level
+            && call.GetArguments()[2] is { } state
+            && state.ToString()!.Contains(messageContains, StringComparison.Ordinal));
 
     [Fact]
     public async Task CreatesThePurgeJob_GivenItDoesNotExist()
@@ -75,5 +90,38 @@ public sealed class BuiltInJobSeeder_Tests
             .Returns<ScheduledJobRecord?>(_ => throw new InvalidOperationException("storage down"));
 
         await Should.NotThrowAsync(() => CreateSut().SeedAsync());
+    }
+
+    [Fact]
+    public async Task DoesNotThrow_GivenSeedingIsCancelled()
+    {
+        _jobRepository.GetByNameAsync("purge-job-runs", Arg.Any<CancellationToken>())
+            .Returns<ScheduledJobRecord?>(_ => throw new OperationCanceledException("seed timed out"));
+
+        await Should.NotThrowAsync(() => CreateSut().SeedAsync());
+    }
+
+    [Fact]
+    public async Task LogsAWarningRatherThanAnError_GivenSeedingIsCancelled()
+    {
+        _jobRepository.GetByNameAsync("purge-job-runs", Arg.Any<CancellationToken>())
+            .Returns<ScheduledJobRecord?>(_ => throw new OperationCanceledException("seed timed out"));
+
+        await CreateSut().SeedAsync();
+
+        LoggedAt(LogLevel.Warning, "timed out or was cancelled").ShouldBeTrue();
+        LoggedAt(LogLevel.Error, "Failed to seed").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task SkipsCreationAndLogsAnError_GivenAnUnparseableCronExpression()
+    {
+        _jobRepository.GetByNameAsync("purge-job-runs", Arg.Any<CancellationToken>())
+            .Returns((ScheduledJobRecord?)null);
+
+        await CreateSut().SeedAsync("not-a-cron-expression");
+
+        await _jobRepository.DidNotReceiveWithAnyArgs().CreateAsync(default!, default);
+        LoggedAt(LogLevel.Error, "not-a-cron-expression").ShouldBeTrue();
     }
 }

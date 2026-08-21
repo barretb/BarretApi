@@ -254,9 +254,12 @@ var app = builder.Build();
 app.Services.GetRequiredService<JobHandlerRegistry>();
 
 // Seeds the built-in purge-job-runs definition if it is missing. Never overwrites an
-// existing row, so a paused or retuned job survives a restart. Storage failures are
-// swallowed inside SeedAsync so the API still starts.
-await app.Services.GetRequiredService<BuiltInJobSeeder>().SeedAsync();
+// existing row, so a paused or retuned job survives a restart. Seeding is best-effort:
+// bounded so a slow or unreachable table cannot delay startup (this app runs with Always
+// On, so a hung startup delays App Service marking the instance healthy). Storage and
+// timeout failures are both swallowed inside SeedAsync so the API still starts.
+using var seedTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+await app.Services.GetRequiredService<BuiltInJobSeeder>().SeedAsync(seedTimeout.Token);
 
 app.UseCors();
 app.UseAuthentication();
