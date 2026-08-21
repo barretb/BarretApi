@@ -28,8 +28,9 @@ public sealed class UpdateJobEndpoint_HandleAsync_Tests
             => Task.FromResult(JobExecutionResult.Ok());
     }
 
-    private UpdateJobEndpoint CreateEndpoint()
+    private UpdateJobEndpoint CreateEndpoint(string routeName = "daily-tip")
         => Factory.Create<UpdateJobEndpoint>(
+            ctx => ctx.Request.RouteValues["Name"] = routeName,
             _jobRepository,
             _registry,
             _timeProvider,
@@ -156,5 +157,21 @@ public sealed class UpdateJobEndpoint_HandleAsync_Tests
 
         ep.ValidationFailures.ShouldNotBeEmpty();
         await _jobRepository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task UsesTheRouteNameNotTheBodyName_GivenTheyDiffer()
+    {
+        var existing = CreateExisting();
+        _jobRepository.GetByNameAsync("daily-tip", Arg.Any<CancellationToken>()).Returns(existing);
+        var request = CreateRequest();
+        request.Name = "some-other-job";
+        var ep = CreateEndpoint(routeName: "daily-tip");
+
+        await ep.HandleAsync(request, default);
+
+        await _jobRepository.Received(1).GetByNameAsync("daily-tip", Arg.Any<CancellationToken>());
+        await _jobRepository.DidNotReceive().GetByNameAsync("some-other-job", Arg.Any<CancellationToken>());
+        await _jobRepository.Received(1).UpdateAsync(existing, Arg.Any<CancellationToken>());
     }
 }

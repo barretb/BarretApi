@@ -33,16 +33,23 @@ public sealed class UpdateJobEndpoint(
 
     public override async Task HandleAsync(SaveJobRequest req, CancellationToken ct)
     {
-        if (!_handlerRegistry.IsRegistered(req.JobType))
-        {
-            AddError(
-                r => r.JobType,
-                $"'{req.JobType}' is not a registered job type. Call GET /api/jobs/types for the list.");
-        }
+        // The route segment is the job's identity, not whatever "Name" the body carries.
+        // Reading it explicitly (rather than relying on req.Name, which model-binding
+        // happens to populate from the route today) keeps the lookup correct even if
+        // route-vs-body binding precedence ever changes.
+        var name = Route<string>("Name");
 
-        if (!CronSchedule.TryParse(req.CronExpression, req.TimeZoneId, out _, out var scheduleError))
+        if (!JobRequestValidation.TryBuildSchedule(req, _handlerRegistry, out var schedule, out var jobTypeError, out var scheduleError))
         {
-            AddError(r => r.CronExpression, scheduleError ?? "The schedule is not valid.");
+            if (jobTypeError is not null)
+            {
+                AddError(r => r.JobType, jobTypeError);
+            }
+
+            if (scheduleError is not null)
+            {
+                AddError(r => r.CronExpression, scheduleError);
+            }
         }
 
         if (ValidationFailed)
@@ -51,7 +58,7 @@ public sealed class UpdateJobEndpoint(
             return;
         }
 
-        var job = await _jobRepository.GetByNameAsync(req.Name, ct);
+        var job = await _jobRepository.GetByNameAsync(name!, ct);
         if (job is null)
         {
             await Send.NotFoundAsync(ct);
@@ -80,7 +87,7 @@ public sealed class UpdateJobEndpoint(
         }
         else if (scheduleChanged || !wasEnabled || job.NextRunUtc is null)
         {
-            job.NextRunUtc = JobRequestValidation.ComputeNextRun(req, now);
+            job.NextRunUtc = JobRequestValidation.ComputeNextRun(req, schedule!, now);
         }
 
         await _jobRepository.UpdateAsync(job, ct);

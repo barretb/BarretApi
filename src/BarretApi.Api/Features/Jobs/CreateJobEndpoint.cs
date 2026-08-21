@@ -34,8 +34,19 @@ public sealed class CreateJobEndpoint(
 
     public override async Task HandleAsync(SaveJobRequest req, CancellationToken ct)
     {
-        if (!await ValidateScheduleAsync(req, ct))
+        if (!JobRequestValidation.TryBuildSchedule(req, _handlerRegistry, out var schedule, out var jobTypeError, out var scheduleError))
         {
+            if (jobTypeError is not null)
+            {
+                AddError(r => r.JobType, jobTypeError);
+            }
+
+            if (scheduleError is not null)
+            {
+                AddError(r => r.CronExpression, scheduleError);
+            }
+
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -58,7 +69,7 @@ public sealed class CreateJobEndpoint(
             IsEnabled = req.IsEnabled,
             MaxRetryCount = req.MaxRetryCount,
             RetryBaseDelaySeconds = req.RetryBaseDelaySeconds,
-            NextRunUtc = JobRequestValidation.ComputeNextRun(req, now),
+            NextRunUtc = JobRequestValidation.ComputeNextRun(req, schedule, now),
             RunState = JobRunState.Idle,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -72,32 +83,5 @@ public sealed class CreateJobEndpoint(
             job.NextRunUtc);
 
         await Send.OkAsync(JobResponseMapper.ToResponse(job), ct);
-    }
-
-    /// <summary>
-    /// Rules the shape validator cannot express because they need the handler registry
-    /// and the cron parser. Adds errors and sends a 400 when anything fails.
-    /// </summary>
-    private async Task<bool> ValidateScheduleAsync(SaveJobRequest req, CancellationToken ct)
-    {
-        if (!_handlerRegistry.IsRegistered(req.JobType))
-        {
-            AddError(
-                r => r.JobType,
-                $"'{req.JobType}' is not a registered job type. Call GET /api/jobs/types for the list.");
-        }
-
-        if (!CronSchedule.TryParse(req.CronExpression, req.TimeZoneId, out _, out var scheduleError))
-        {
-            AddError(r => r.CronExpression, scheduleError ?? "The schedule is not valid.");
-        }
-
-        if (ValidationFailed)
-        {
-            await Send.ErrorsAsync(400, ct);
-            return false;
-        }
-
-        return true;
     }
 }
