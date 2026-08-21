@@ -2198,6 +2198,8 @@ Two consequences worth knowing:
 - **Jobs only run while the container is up.** A push still queues a run, but it expires after about 24 hours if the machine is off — so a deploy can silently never happen. Check the Actions tab if a change does not appear in production.
 - **The workspace persists between runs.** The publish step clears its output directory first, since `dotnet publish` writes over stale files rather than replacing the directory.
 
+The image installs the **Azure CLI** (the `INSTALL_AZURE_CLI` build arg on the service). This is not optional: `azure/login@v2` shells out to `az`, which GitHub-hosted images preinstall and a plain .NET SDK image does not, so the deploy fails with `Unable to locate executable file: az` without it. The arg defaults to false so the DungeonHostv4 runner, which never deploys, does not carry it.
+
 The container carries no Docker socket. If CI ever needs to run the Testcontainers-based integration tests, mount `/var/run/docker.sock` into the service the way the DungeonHostv4 runner does.
 ## Production Notes
 
