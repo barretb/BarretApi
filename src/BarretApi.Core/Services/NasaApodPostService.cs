@@ -10,6 +10,7 @@ public class NasaApodPostService(
     IImageResizer imageResizer,
     ILogger<NasaApodPostService> logger,
     IEmailNotificationService? emailNotificationService = null)
+    : INasaApodPostService
 {
     private readonly INasaApodClient _nasaApodClient = nasaApodClient;
     private readonly SocialPostService _socialPostService = socialPostService;

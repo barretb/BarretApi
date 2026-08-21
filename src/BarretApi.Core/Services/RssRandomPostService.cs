@@ -9,6 +9,7 @@ public sealed class RssRandomPostService(
     SocialPostService socialPostService,
     ILogger<RssRandomPostService> logger,
     IEmailNotificationService? emailNotificationService = null)
+    : IRssRandomPostService
 {
     private readonly IBlogFeedReader _blogFeedReader = blogFeedReader;
     private readonly SocialPostService _socialPostService = socialPostService;

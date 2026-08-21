@@ -12,6 +12,7 @@ public class NasaGibsPostService(
     IOptions<NasaGibsOptions> options,
     ILogger<NasaGibsPostService> logger,
     IEmailNotificationService? emailNotificationService = null)
+    : INasaGibsPostService
 {
     private readonly INasaGibsClient _nasaGibsClient = nasaGibsClient;
     private readonly SocialPostService _socialPostService = socialPostService;

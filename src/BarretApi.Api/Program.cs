@@ -156,7 +156,9 @@ builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestra
 builder.Services.AddSingleton<IScheduledSocialPostProcessor, ScheduledSocialPostProcessor>();
 builder.Services.AddSingleton<SocialPostService>();
 builder.Services.AddSingleton<RssRandomPostService>();
+builder.Services.AddSingleton<IRssRandomPostService>(sp => sp.GetRequiredService<RssRandomPostService>());
 builder.Services.AddSingleton<TipOfDayService>();
+builder.Services.AddSingleton<ITipOfDayService>(sp => sp.GetRequiredService<TipOfDayService>());
 
 builder.Services.Configure<NasaApodOptions>(builder.Configuration.GetSection(NasaApodOptions.SectionName));
 builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
@@ -168,6 +170,7 @@ builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
 builder.Services.AddSingleton<INasaApodClient>(sp => sp.GetRequiredService<NasaApodClient>());
 builder.Services.AddSingleton<IImageResizer, SkiaImageResizer>();
 builder.Services.AddSingleton<NasaApodPostService>();
+builder.Services.AddSingleton<INasaApodPostService>(sp => sp.GetRequiredService<NasaApodPostService>());
 
 builder.Services.Configure<NasaGibsOptions>(builder.Configuration.GetSection(NasaGibsOptions.SectionName));
 builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
@@ -179,6 +182,7 @@ builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
 });
 builder.Services.AddSingleton<INasaGibsClient>(sp => sp.GetRequiredService<NasaGibsClient>());
 builder.Services.AddSingleton<NasaGibsPostService>();
+builder.Services.AddSingleton<INasaGibsPostService>(sp => sp.GetRequiredService<NasaGibsPostService>());
 
 builder.Services.AddHttpClient<DiceBearAvatarClient>(client =>
 {

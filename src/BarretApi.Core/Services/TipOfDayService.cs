@@ -11,6 +11,7 @@ public sealed class TipOfDayService(
 	SocialPostService socialPostService,
 	IOptions<TipOfDayOptions> tipOfDayOptions,
 	ILogger<TipOfDayService> logger)
+	: ITipOfDayService
 {
 	private readonly ITipOfDayRepository _tipOfDayRepository = tipOfDayRepository;
 	private readonly SocialPostService _socialPostService = socialPostService;
