@@ -7,27 +7,29 @@ internal static class JobRequestValidation
 {
     /// <summary>
     /// Validates the job type is registered and the cron expression/time zone parse,
-    /// parsing the schedule exactly once. Returns true only when both checks pass, in
+    /// parsing the schedule exactly once. Returns true only when all checks pass, in
     /// which case <paramref name="schedule"/> is the parsed result. Callers add the
     /// returned error messages against the field the error concerns
-    /// (<c>r.JobType</c> or <c>r.CronExpression</c>) so client responses point at the
-    /// offending field.
+    /// (<c>r.JobType</c>, <c>r.CronExpression</c>, or <c>r.TimeZoneId</c>) so client
+    /// responses point at the offending field instead of lumping cron and time zone
+    /// problems together.
     /// </summary>
     public static bool TryBuildSchedule(
         SaveJobRequest request,
         JobHandlerRegistry handlerRegistry,
         [NotNullWhen(true)] out CronSchedule? schedule,
         out string? jobTypeError,
-        out string? scheduleError)
+        out string? cronError,
+        out string? timeZoneError)
     {
         jobTypeError = handlerRegistry.IsRegistered(request.JobType)
             ? null
             : $"'{request.JobType}' is not a registered job type. Call GET /api/jobs/types for the list.";
 
-        var scheduleValid = CronSchedule.TryParse(request.CronExpression, request.TimeZoneId, out schedule, out scheduleError);
-        if (!scheduleValid)
+        var scheduleValid = CronSchedule.TryParse(request.CronExpression, request.TimeZoneId, out schedule, out cronError, out timeZoneError);
+        if (!scheduleValid && cronError is null && timeZoneError is null)
         {
-            scheduleError ??= "The schedule is not valid.";
+            cronError = "The schedule is not valid.";
         }
 
         return jobTypeError is null && scheduleValid;

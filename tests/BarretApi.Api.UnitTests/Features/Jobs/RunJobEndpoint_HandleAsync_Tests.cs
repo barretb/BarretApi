@@ -44,8 +44,9 @@ public sealed class RunJobEndpoint_HandleAsync_Tests
             _timeProvider,
             NullLogger<JobDispatcher>.Instance);
 
-    private RunJobEndpoint CreateEndpoint(bool handlerSucceeds = true)
+    private RunJobEndpoint CreateEndpoint(bool handlerSucceeds = true, string routeName = "daily-tip")
         => Factory.Create<RunJobEndpoint>(
+            ctx => ctx.Request.RouteValues["Name"] = routeName,
             CreateDispatcher(handlerSucceeds),
             NullLogger<RunJobEndpoint>.Instance);
 
@@ -81,9 +82,9 @@ public sealed class RunJobEndpoint_HandleAsync_Tests
     {
         _jobRepository.GetByNameAsync("missing", Arg.Any<CancellationToken>())
             .Returns((ScheduledJobRecord?)null);
-        var ep = CreateEndpoint();
+        var ep = CreateEndpoint(routeName: "missing");
 
-        await ep.HandleAsync(new GetJobRequest { Name = "missing" }, default);
+        await ep.HandleAsync(default);
 
         ep.HttpContext.Response.StatusCode.ShouldBe(404);
     }
@@ -97,7 +98,7 @@ public sealed class RunJobEndpoint_HandleAsync_Tests
         _jobRepository.GetByNameAsync("daily-tip", Arg.Any<CancellationToken>()).Returns(job);
         var ep = CreateEndpoint();
 
-        await ep.HandleAsync(new GetJobRequest { Name = "daily-tip" }, default);
+        await ep.HandleAsync(default);
 
         ep.HttpContext.Response.StatusCode.ShouldBe(409);
         ep.ValidationFailures.ShouldNotBeEmpty();
@@ -110,7 +111,7 @@ public sealed class RunJobEndpoint_HandleAsync_Tests
         AllowClaim();
         var ep = CreateEndpoint();
 
-        await ep.HandleAsync(new GetJobRequest { Name = "daily-tip" }, default);
+        await ep.HandleAsync(default);
 
         ep.Response.Status.ShouldBe("Succeeded");
         ep.Response.TriggerType.ShouldBe("Manual");
@@ -124,7 +125,7 @@ public sealed class RunJobEndpoint_HandleAsync_Tests
         AllowClaim();
         var ep = CreateEndpoint(handlerSucceeds: false);
 
-        await ep.HandleAsync(new GetJobRequest { Name = "daily-tip" }, default);
+        await ep.HandleAsync(default);
 
         ep.HttpContext.Response.StatusCode.ShouldBe(502);
     }
@@ -138,7 +139,7 @@ public sealed class RunJobEndpoint_HandleAsync_Tests
         AllowClaim();
         var ep = CreateEndpoint();
 
-        await ep.HandleAsync(new GetJobRequest { Name = "daily-tip" }, default);
+        await ep.HandleAsync(default);
 
         job.NextRunUtc.ShouldBe(originalNextRun);
     }

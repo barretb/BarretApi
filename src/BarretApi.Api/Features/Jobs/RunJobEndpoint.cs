@@ -7,7 +7,7 @@ namespace BarretApi.Api.Features.Jobs;
 public sealed class RunJobEndpoint(
     JobDispatcher dispatcher,
     ILogger<RunJobEndpoint> logger)
-    : Endpoint<GetJobRequest, JobRunResponse>
+    : EndpointWithoutRequest<JobRunResponse>
 {
     private readonly JobDispatcher _dispatcher = dispatcher;
     private readonly ILogger<RunJobEndpoint> _logger = logger;
@@ -19,7 +19,7 @@ public sealed class RunJobEndpoint(
         Summary(s =>
         {
             s.Summary = "Run a job immediately";
-            s.Description = "Runs the job out of band without changing its next run time. Works on a disabled job. Returns 409 if a run is already in progress.";
+            s.Description = "Runs the job out of band without changing its next run time. Works on a disabled job. Takes no request body; the job name comes from the route. Returns 409 if a run is already in progress.";
             s.Responses[200] = "The run completed successfully.";
             s.Responses[401] = "Missing or invalid X-Api-Key.";
             s.Responses[404] = "No job with that name exists.";
@@ -28,9 +28,10 @@ public sealed class RunJobEndpoint(
         });
     }
 
-    public override async Task HandleAsync(GetJobRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        var result = await _dispatcher.RunManuallyAsync(req.Name, ct);
+        var name = Route<string>("Name")!;
+        var result = await _dispatcher.RunManuallyAsync(name, ct);
 
         switch (result.Outcome)
         {
@@ -39,8 +40,8 @@ public sealed class RunJobEndpoint(
                 return;
 
             case ManualRunOutcome.Busy:
-                _logger.LogInformation("Manual run of job {JobName} was rejected: already running.", req.Name);
-                AddError(r => r.Name, "A run is already in progress for this job.");
+                _logger.LogInformation("Manual run of job {JobName} was rejected: already running.", name);
+                AddError("A run is already in progress for this job.");
                 await Send.ErrorsAsync(409, ct);
                 return;
 

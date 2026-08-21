@@ -148,14 +148,30 @@ public sealed class UpdateJobEndpoint_HandleAsync_Tests
     }
 
     [Fact]
-    public async Task Returns400_GivenAnUnparseableCronExpression()
+    public async Task Returns400WithACronExpressionError_GivenAnUnparseableCronExpression()
     {
         _jobRepository.GetByNameAsync("daily-tip", Arg.Any<CancellationToken>()).Returns(CreateExisting());
         var ep = CreateEndpoint();
 
         await ep.HandleAsync(CreateRequest(cron: "not a cron"), default);
 
-        ep.ValidationFailures.ShouldNotBeEmpty();
+        ep.ValidationFailures.ShouldContain(e => e.PropertyName == "CronExpression");
+        ep.ValidationFailures.ShouldNotContain(e => e.PropertyName == "TimeZoneId");
+        await _jobRepository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Returns400WithATimeZoneIdError_GivenAnUnknownTimeZone()
+    {
+        _jobRepository.GetByNameAsync("daily-tip", Arg.Any<CancellationToken>()).Returns(CreateExisting());
+        var ep = CreateEndpoint();
+        var request = CreateRequest();
+        request.TimeZoneId = "Mars/Olympus_Mons";
+
+        await ep.HandleAsync(request, default);
+
+        ep.ValidationFailures.ShouldContain(e => e.PropertyName == "TimeZoneId");
+        ep.ValidationFailures.ShouldNotContain(e => e.PropertyName == "CronExpression");
         await _jobRepository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
     }
 

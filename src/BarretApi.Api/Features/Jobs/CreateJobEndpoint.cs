@@ -34,16 +34,21 @@ public sealed class CreateJobEndpoint(
 
     public override async Task HandleAsync(SaveJobRequest req, CancellationToken ct)
     {
-        if (!JobRequestValidation.TryBuildSchedule(req, _handlerRegistry, out var schedule, out var jobTypeError, out var scheduleError))
+        if (!JobRequestValidation.TryBuildSchedule(req, _handlerRegistry, out var schedule, out var jobTypeError, out var cronError, out var timeZoneError))
         {
             if (jobTypeError is not null)
             {
                 AddError(r => r.JobType, jobTypeError);
             }
 
-            if (scheduleError is not null)
+            if (cronError is not null)
             {
-                AddError(r => r.CronExpression, scheduleError);
+                AddError(r => r.CronExpression, cronError);
+            }
+
+            if (timeZoneError is not null)
+            {
+                AddError(r => r.TimeZoneId, timeZoneError);
             }
 
             await Send.ErrorsAsync(400, ct);

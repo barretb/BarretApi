@@ -23,12 +23,30 @@ public sealed class CronSchedule
         out CronSchedule? schedule,
         out string? error)
     {
+        var result = TryParse(expression, timeZoneId, out schedule, out var cronError, out var timeZoneError);
+        error = cronError ?? timeZoneError;
+        return result;
+    }
+
+    /// <summary>
+    /// As <see cref="TryParse(string, string, out CronSchedule?, out string?)"/>, but reports
+    /// the cron and time zone failures separately so callers can attribute the error to the
+    /// right field instead of guessing from a combined message.
+    /// </summary>
+    public static bool TryParse(
+        string expression,
+        string timeZoneId,
+        out CronSchedule? schedule,
+        out string? cronError,
+        out string? timeZoneError)
+    {
         schedule = null;
-        error = null;
+        cronError = null;
+        timeZoneError = null;
 
         if (string.IsNullOrWhiteSpace(expression))
         {
-            error = "Cron expression is required.";
+            cronError = "Cron expression is required.";
             return false;
         }
 
@@ -43,7 +61,7 @@ public sealed class CronSchedule
         }
         catch (CronFormatException ex)
         {
-            error = $"Cron expression is not valid: {ex.Message}";
+            cronError = $"Cron expression is not valid: {ex.Message}";
             return false;
         }
 
@@ -60,7 +78,7 @@ public sealed class CronSchedule
             }
             catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
             {
-                error = $"Unknown time zone '{timeZoneId}'.";
+                timeZoneError = $"Unknown time zone '{timeZoneId}'.";
                 return false;
             }
         }
