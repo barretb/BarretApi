@@ -100,6 +100,7 @@ public sealed class RunJobEndpoint_HandleAsync_Tests
         await ep.HandleAsync(new GetJobRequest { Name = "daily-tip" }, default);
 
         ep.HttpContext.Response.StatusCode.ShouldBe(409);
+        ep.ValidationFailures.ShouldNotBeEmpty();
     }
 
     [Fact]

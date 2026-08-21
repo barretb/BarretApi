@@ -40,19 +40,8 @@ public sealed class RunJobEndpoint(
 
             case ManualRunOutcome.Busy:
                 _logger.LogInformation("Manual run of job {JobName} was rejected: already running.", req.Name);
-                await Send.ResponseAsync(
-                    new JobRunResponse
-                    {
-                        RunId = string.Empty,
-                        JobName = req.Name,
-                        JobType = string.Empty,
-                        TriggerType = nameof(JobTriggerType.Manual),
-                        StartedAtUtc = default,
-                        Status = "Busy",
-                        ErrorMessage = "A run is already in progress for this job."
-                    },
-                    409,
-                    ct);
+                AddError(r => r.Name, "A run is already in progress for this job.");
+                await Send.ErrorsAsync(409, ct);
                 return;
 
             default:
