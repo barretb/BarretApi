@@ -31,6 +31,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
   - [GET /api/github/repos/{name} — Get Repository Details](#get-apigithubreposname--get-repository-details)
   - [POST /api/github/repos/{name}/issues — Create GitHub Issue](#post-apigithubreposnameissues--create-github-issue)
 - [Configuration](#configuration)
+- [Deployment](#deployment)
 - [Production Notes](#production-notes)
 
 ## Project Structure
@@ -2169,6 +2170,35 @@ Rate limiting is **always active** when email notifications are enabled. No addi
 
 **Complete Documentation:** See [`docs/EMAIL_NOTIFICATIONS.md`](docs/EMAIL_NOTIFICATIONS.md) and [`docs/EMAIL_RATE_LIMITING.md`](docs/EMAIL_RATE_LIMITING.md) for detailed information on email notifications, rate limiting, troubleshooting, and production deployment.
 
+## Deployment
+
+Pushing to `main` builds, publishes, and deploys the API to the `barretapi` Azure Web App via `.github/workflows/main_barretapi.yml`. The workflow can also be triggered by hand with `workflow_dispatch`. Azure authentication uses OIDC federated credentials (`azure/login@v2`) — there is no publish profile or password secret, only the client/tenant/subscription IDs.
+
+Build and deploy are a single job. They were split so the publish output could cross between two GitHub-hosted runners as an artifact; both halves now run on the same machine, so that upload/download round-trip was removed.
+
+Note that CI does not run the test suites — it only proves the API project compiles and publishes. Run them locally before pushing:
+
+```bash
+dotnet test
+```
+
+### Self-hosted runner
+
+The workflow runs on a **self-hosted runner** registered to this repository, not on GitHub-hosted minutes. The runner is a Docker container defined in `C:\projects\RunBarretRun\compose.yaml` (service `barretapi-runner`), sharing the .NET SDK image used by the DungeonHostv4 runner. It is a separate container only because runners on a personal account are scoped to a single repository.
+
+Start it (the first run needs a registration token; afterwards the registration persists in the `barretapi-runner-data` volume):
+
+```powershell
+$env:BARRETAPI_RUNNER_TOKEN = (gh api -X POST repos/barretb/BarretApi/actions/runners/registration-token --jq .token)
+docker compose -f C:\projects\RunBarretRun\compose.yaml up -d --build barretapi-runner
+```
+
+Two consequences worth knowing:
+
+- **Jobs only run while the container is up.** A push still queues a run, but it expires after about 24 hours if the machine is off — so a deploy can silently never happen. Check the Actions tab if a change does not appear in production.
+- **The workspace persists between runs.** The publish step clears its output directory first, since `dotnet publish` writes over stale files rather than replacing the directory.
+
+The container carries no Docker socket. If CI ever needs to run the Testcontainers-based integration tests, mount `/var/run/docker.sock` into the service the way the DungeonHostv4 runner does.
 ## Production Notes
 
 ### HTTPS Requirement
