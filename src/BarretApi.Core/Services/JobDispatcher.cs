@@ -206,7 +206,15 @@ public sealed class JobDispatcher(
         stopwatch.Stop();
 
         var status = result!.Success ? JobRunStatus.Succeeded : JobRunStatus.Failed;
-        await CompleteRunAsync(job, run, status, result.Summary, result.ErrorMessage, stopwatch, cancellationToken);
+        await CompleteRunAsync(
+            job,
+            run,
+            status,
+            result.Summary,
+            result.ErrorMessage,
+            stopwatch,
+            cancellationToken,
+            isPartialSuccess: result.IsPartialSuccess);
 
         if (status == JobRunStatus.Failed)
         {
@@ -282,7 +290,8 @@ public sealed class JobDispatcher(
         string? summary,
         string? errorMessage,
         Stopwatch stopwatch,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isPartialSuccess = false)
     {
         var completedAt = _timeProvider.GetUtcNow();
 
@@ -300,7 +309,10 @@ public sealed class JobDispatcher(
         job.LastRunDurationMs = run.DurationMs;
         job.UpdatedAtUtc = completedAt;
 
-        if (status == JobRunStatus.Succeeded)
+        // A partial success is still `Succeeded` (so it is never retried), but it is not
+        // a clean run — it must keep climbing the failure count rather than resetting it,
+        // or a job that fails on the same platform every day would look permanently healthy.
+        if (status == JobRunStatus.Succeeded && !isPartialSuccess)
         {
             job.ConsecutiveFailureCount = 0;
         }

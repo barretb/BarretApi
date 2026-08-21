@@ -39,7 +39,8 @@ internal static class PlatformResultSummary
         var succeeded = results.Where(r => r.Success).ToList();
         var succeededPlatforms = string.Join(", ", succeeded.Select(r => r.Platform));
 
-        return JobExecutionResult.Ok(
-            $"Posted \"{subject}\" to {succeededPlatforms}. Failed on {failureDetail}. Not retried to avoid duplicate posts on the platforms that already succeeded.");
+        return JobExecutionResult.PartialSuccess(
+            $"Posted \"{subject}\" to {succeededPlatforms}. Failed on {failureDetail}. Not retried to avoid duplicate posts on the platforms that already succeeded.",
+            failureDetail);
     }
 }

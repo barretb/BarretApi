@@ -132,4 +132,18 @@ public sealed class TipOfDayJobHandler_Tests
         result.Summary!.ShouldContain("linkedin");
         result.Summary!.ShouldContain("boom");
     }
+
+    [Fact]
+    public async Task RecordsTheFailedPlatformInErrorMessage_GivenOnlySomePlatformsFailed()
+    {
+        _service.SelectAndPostAsync(Arg.Any<TipOfDayPostCommand>(), Arg.Any<CancellationToken>())
+            .Returns(CreatePartialResult());
+
+        var result = await CreateSut().ExecuteAsync(CreateContext("""{"category":"dotnet"}"""));
+
+        result.Success.ShouldBeTrue();
+        result.IsPartialSuccess.ShouldBeTrue();
+        result.ErrorMessage!.ShouldContain("linkedin");
+        result.ErrorMessage!.ShouldContain("boom");
+    }
 }
