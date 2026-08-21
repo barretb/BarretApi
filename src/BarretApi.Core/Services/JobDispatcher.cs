@@ -75,6 +75,38 @@ public sealed class JobDispatcher(
         return executedCount;
     }
 
+    /// <summary>
+    /// Runs a job out of band. Does not change the job's next run time, and works on a
+    /// disabled job. Returns <see cref="ManualRunOutcome.Busy"/> rather than starting a
+    /// second concurrent execution.
+    /// </summary>
+    public async Task<ManualRunResult> RunManuallyAsync(
+        string jobName,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
+
+        var job = await _jobRepository.GetByNameAsync(jobName, cancellationToken);
+        if (job is null)
+        {
+            return new ManualRunResult(ManualRunOutcome.NotFound, null);
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        if (job.RunState == JobRunState.Running && !IsClaimStale(job, now))
+        {
+            return new ManualRunResult(ManualRunOutcome.Busy, null);
+        }
+
+        if (!await _jobRepository.TryClaimAsync(job, now, cancellationToken))
+        {
+            return new ManualRunResult(ManualRunOutcome.Busy, null);
+        }
+
+        var run = await ExecuteClaimedJobAsync(job, JobTriggerType.Manual, null, cancellationToken);
+        return new ManualRunResult(ManualRunOutcome.Completed, run);
+    }
+
     private async Task<JobRunRecord> ExecuteClaimedJobAsync(
         ScheduledJobRecord job,
         JobTriggerType triggerType,
