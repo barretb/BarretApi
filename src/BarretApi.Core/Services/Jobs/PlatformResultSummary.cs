@@ -3,8 +3,11 @@ using BarretApi.Core.Models;
 namespace BarretApi.Core.Services.Jobs;
 
 /// <summary>
-/// Turns platform post results into a job outcome. Any platform failure fails the run,
-/// so a partial publish is retried and reported rather than silently accepted.
+/// Turns platform post results into a job outcome. Handlers have no per-platform
+/// idempotency, so retrying a run that already published to some platforms would
+/// duplicate that content. A run only fails — and is therefore retried — when
+/// nothing published anywhere; a partial publish is reported as a success whose
+/// summary names the platforms that still failed.
 /// </summary>
 internal static class PlatformResultSummary
 {
@@ -24,10 +27,19 @@ internal static class PlatformResultSummary
             return JobExecutionResult.Ok($"Posted \"{subject}\" to {platforms}.");
         }
 
-        var detail = string.Join(
+        var failureDetail = string.Join(
             "; ",
             failures.Select(f => $"{f.Platform}: {f.ErrorMessage ?? f.ErrorCode ?? "failed"}"));
 
-        return JobExecutionResult.Fail($"Failed to post \"{subject}\" — {detail}", $"Posted \"{subject}\".");
+        if (failures.Count == results.Count)
+        {
+            return JobExecutionResult.Fail($"Failed to post \"{subject}\" — {failureDetail}", $"Posted \"{subject}\".");
+        }
+
+        var succeeded = results.Where(r => r.Success).ToList();
+        var succeededPlatforms = string.Join(", ", succeeded.Select(r => r.Platform));
+
+        return JobExecutionResult.Ok(
+            $"Posted \"{subject}\" to {succeededPlatforms}. Failed on {failureDetail}. Not retried to avoid duplicate posts on the platforms that already succeeded.");
     }
 }

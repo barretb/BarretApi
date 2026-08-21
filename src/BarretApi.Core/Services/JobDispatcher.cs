@@ -133,12 +133,25 @@ public sealed class JobDispatcher(
         if (fatalConfigurationError is not null)
         {
             stopwatch.Stop();
-            job.IsEnabled = false;
+
+            if (triggerType == JobTriggerType.Scheduled)
+            {
+                job.IsEnabled = false;
+                _logger.LogError(
+                    "Job {JobName} has been disabled because it is misconfigured: {Error}",
+                    job.Name,
+                    fatalConfigurationError);
+            }
+            else
+            {
+                _logger.LogError(
+                    "Job {JobName} is misconfigured: {Error}",
+                    job.Name,
+                    fatalConfigurationError);
+            }
+
             await CompleteRunAsync(job, run, JobRunStatus.Failed, null, fatalConfigurationError, stopwatch, cancellationToken);
-            _logger.LogError(
-                "Job {JobName} has been disabled because it is misconfigured: {Error}",
-                job.Name,
-                fatalConfigurationError);
+            await NotifyFailureAsync(job, run, cancellationToken);
             return run;
         }
 
@@ -162,19 +175,9 @@ public sealed class JobDispatcher(
             {
                 result = await handler.ExecuteAsync(context, cancellationToken);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                stopwatch.Stop();
-                _logger.LogWarning("Job {JobName} was cancelled during execution.", job.Name);
-                await CompleteRunAsync(
-                    job,
-                    run,
-                    JobRunStatus.Aborted,
-                    null,
-                    "Execution was cancelled before it completed.",
-                    stopwatch,
-                    CancellationToken.None);
-                return run;
+                return await AbortRunAsync(job, run, stopwatch, "during execution", cancellationToken: CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -189,7 +192,14 @@ public sealed class JobDispatcher(
 
             if (attempt < maxAttempts)
             {
-                await DelayBeforeRetryAsync(job, attempt, cancellationToken);
+                try
+                {
+                    await DelayBeforeRetryAsync(job, attempt, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return await AbortRunAsync(job, run, stopwatch, "while waiting to retry", cancellationToken: CancellationToken.None);
+                }
             }
         }
 
@@ -237,6 +247,32 @@ public sealed class JobDispatcher(
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Records a genuine-shutdown abort and releases the claim. Called whether cancellation
+    /// happens while the handler is running or while waiting out the retry backoff — either
+    /// way nothing further should be attempted, and the run must still be written so the
+    /// claim does not wedge until the timeout.
+    /// </summary>
+    private async Task<JobRunRecord> AbortRunAsync(
+        ScheduledJobRecord job,
+        JobRunRecord run,
+        Stopwatch stopwatch,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        stopwatch.Stop();
+        _logger.LogWarning("Job {JobName} was cancelled {Reason}.", job.Name, reason);
+        await CompleteRunAsync(
+            job,
+            run,
+            JobRunStatus.Aborted,
+            null,
+            "Execution was cancelled before it completed.",
+            stopwatch,
+            cancellationToken);
+        return run;
     }
 
     private async Task CompleteRunAsync(
@@ -309,8 +345,9 @@ public sealed class JobDispatcher(
     }
 
     /// <summary>
-    /// Sent only once every attempt has failed. Rate limiting lives inside the
-    /// notification service, so a permanently broken job cannot flood the inbox.
+    /// Sent once every attempt has failed (or once for a misconfigured job that never
+    /// attempts at all). There is currently no rate limiting on these emails — a job
+    /// that is scheduled frequently and stays broken will send one email per failed run.
     /// </summary>
     private async Task NotifyFailureAsync(
         ScheduledJobRecord job,

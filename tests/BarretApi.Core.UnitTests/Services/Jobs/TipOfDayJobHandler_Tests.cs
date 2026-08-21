@@ -36,6 +36,24 @@ public sealed class TipOfDayJobHandler_Tests
             AttemptedAtUtc = Now
         };
 
+    private static TipOfDayPostResult CreatePartialResult()
+        => new()
+        {
+            SelectedTip = new TipOfDayRecord
+            {
+                TipId = "tip-1",
+                Category = "dotnet",
+                Tip = "Use TimeProvider."
+            },
+            PlatformResults =
+            [
+                new PlatformPostResult { Platform = "bluesky", Success = true },
+                new PlatformPostResult { Platform = "linkedin", Success = false, ErrorMessage = "boom" }
+            ],
+            TipMarkedPosted = true,
+            AttemptedAtUtc = Now
+        };
+
     [Fact]
     public void UsesTheExpectedJobType()
     {
@@ -90,7 +108,7 @@ public sealed class TipOfDayJobHandler_Tests
     }
 
     [Fact]
-    public async Task Fails_GivenAPlatformFailed()
+    public async Task Fails_GivenEveryPlatformFailed()
     {
         _service.SelectAndPostAsync(Arg.Any<TipOfDayPostCommand>(), Arg.Any<CancellationToken>())
             .Returns(CreateResult(success: false));
@@ -99,5 +117,19 @@ public sealed class TipOfDayJobHandler_Tests
 
         result.Success.ShouldBeFalse();
         result.ErrorMessage!.ShouldContain("bluesky");
+    }
+
+    [Fact]
+    public async Task Succeeds_GivenOnlySomePlatformsFailed()
+    {
+        _service.SelectAndPostAsync(Arg.Any<TipOfDayPostCommand>(), Arg.Any<CancellationToken>())
+            .Returns(CreatePartialResult());
+
+        var result = await CreateSut().ExecuteAsync(CreateContext("""{"category":"dotnet"}"""));
+
+        result.Success.ShouldBeTrue();
+        result.Summary!.ShouldContain("bluesky");
+        result.Summary!.ShouldContain("linkedin");
+        result.Summary!.ShouldContain("boom");
     }
 }

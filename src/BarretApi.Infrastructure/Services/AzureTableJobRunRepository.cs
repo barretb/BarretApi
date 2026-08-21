@@ -121,7 +121,8 @@ public sealed class AzureTableJobRunRepository : IJobRunRepository
         var expired = new List<(string PartitionKey, string RowKey)>();
 
         await foreach (var entity in _tableClient.QueryAsync<TableEntity>(
-            string.Empty,
+            filter: (string?)null,
+            select: new[] { "PartitionKey", "RowKey", "StartedAtUtc" },
             cancellationToken: cancellationToken))
         {
             var startedAt = entity.GetDateTimeOffset("StartedAtUtc");

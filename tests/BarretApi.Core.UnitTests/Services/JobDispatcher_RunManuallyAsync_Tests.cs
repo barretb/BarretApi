@@ -16,6 +16,8 @@ public sealed class JobDispatcher_RunManuallyAsync_Tests
 
     private readonly IScheduledJobRepository _jobRepository = Substitute.For<IScheduledJobRepository>();
     private readonly IJobRunRepository _runRepository = Substitute.For<IJobRunRepository>();
+    private readonly IEmailNotificationService _emailNotificationService =
+        Substitute.For<IEmailNotificationService>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
     private readonly List<JobRunRecord> _recordedRuns = [];
 
@@ -80,7 +82,8 @@ public sealed class JobDispatcher_RunManuallyAsync_Tests
                 TableStorage = new JobSchedulerTableStorageOptions { ConnectionString = "UseDevelopmentStorage=true" }
             }),
             _timeProvider,
-            NullLogger<JobDispatcher>.Instance);
+            NullLogger<JobDispatcher>.Instance,
+            _emailNotificationService);
 
     [Fact]
     public async Task ReturnsNotFound_GivenNoSuchJob()
@@ -178,6 +181,36 @@ public sealed class JobDispatcher_RunManuallyAsync_Tests
 
         result.Outcome.ShouldBe(ManualRunOutcome.Completed);
         handler.CallCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task DoesNotDisableTheJob_GivenAManualRunOfAMisconfiguredJob()
+    {
+        var job = CreateJob();
+        job.JobType = "gone-missing";
+        _jobRepository.GetByNameAsync("daily-tip", Arg.Any<CancellationToken>()).Returns(job);
+
+        var result = await CreateSut(new StubHandler()).RunManuallyAsync("daily-tip");
+
+        result.Outcome.ShouldBe(ManualRunOutcome.Completed);
+        job.IsEnabled.ShouldBeTrue();
+        _recordedRuns.ShouldHaveSingleItem().Status.ShouldBe(JobRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task NotifiesFailure_GivenAManualRunOfAMisconfiguredJob()
+    {
+        var job = CreateJob();
+        job.JobType = "gone-missing";
+        _jobRepository.GetByNameAsync("daily-tip", Arg.Any<CancellationToken>()).Returns(job);
+
+        await CreateSut(new StubHandler()).RunManuallyAsync("daily-tip");
+
+        await _emailNotificationService.Received(1).SendPostFailureNotificationAsync(
+            "job:daily-tip",
+            Arg.Any<string>(),
+            Arg.Any<IDictionary<string, string>>(),
+            Arg.Any<CancellationToken>());
     }
 
 }

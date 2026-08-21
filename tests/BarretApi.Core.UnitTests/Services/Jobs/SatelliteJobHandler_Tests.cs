@@ -35,6 +35,25 @@ public sealed class SatelliteJobHandler_Tests
             false,
             [new PlatformPostResult { Platform = "bluesky", Success = success, ErrorMessage = success ? null : "boom" }]);
 
+    private static SatellitePostResult CreatePartialResult()
+        => new(
+            new DateOnly(2026, 8, 19),
+            "MODIS_Terra_CorrectedReflectance_TrueColor",
+            "Satellite view of Ohio",
+            "https://worldview.earthdata.nasa.gov/",
+            38.0,
+            -85.0,
+            42.5,
+            -80.0,
+            1200,
+            900,
+            true,
+            false,
+            [
+                new PlatformPostResult { Platform = "bluesky", Success = true },
+                new PlatformPostResult { Platform = "mastodon", Success = false, ErrorMessage = "boom" }
+            ]);
+
     [Fact]
     public void UsesTheExpectedJobType()
     {
@@ -98,7 +117,7 @@ public sealed class SatelliteJobHandler_Tests
     }
 
     [Fact]
-    public async Task Fails_GivenAPlatformFailed()
+    public async Task Fails_GivenEveryPlatformFailed()
     {
         _service.PostAsync(
                 Arg.Any<DateOnly?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
@@ -109,5 +128,22 @@ public sealed class SatelliteJobHandler_Tests
         var result = await CreateSut().ExecuteAsync(CreateContext());
 
         result.Success.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Succeeds_GivenOnlySomePlatformsFailed()
+    {
+        _service.PostAsync(
+                Arg.Any<DateOnly?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<double?>(), Arg.Any<double?>(), Arg.Any<double?>(), Arg.Any<double?>(),
+                Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(CreatePartialResult());
+
+        var result = await CreateSut().ExecuteAsync(CreateContext());
+
+        result.Success.ShouldBeTrue();
+        result.Summary!.ShouldContain("bluesky");
+        result.Summary!.ShouldContain("mastodon");
+        result.Summary!.ShouldContain("boom");
     }
 }

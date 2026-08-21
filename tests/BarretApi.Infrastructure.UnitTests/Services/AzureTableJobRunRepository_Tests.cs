@@ -66,7 +66,9 @@ public sealed class AzureTableJobRunRepository_Tests
             .Returns(AsyncEnumeratorOf(entities));
         _tableClient.QueryAsync<TableEntity>(
                 Arg.Any<string>(),
-                cancellationToken: Arg.Any<CancellationToken>())
+                Arg.Any<int?>(),
+                Arg.Any<IEnumerable<string>>(),
+                Arg.Any<CancellationToken>())
             .Returns(pageable);
     }
 
@@ -157,5 +159,23 @@ public sealed class AzureTableJobRunRepository_Tests
 
         deleted.ShouldBe(0);
         await _tableClient.DidNotReceiveWithAnyArgs().DeleteEntityAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task PurgeOlderThanAsync_ScansWithNoFilterAndSelectsOnlyWhatItNeeds()
+    {
+        SetQueryResult();
+
+        await CreateSut().PurgeOlderThanAsync(Now.AddDays(-30));
+
+        _tableClient.Received(1).QueryAsync<TableEntity>(
+            (string?)null,
+            Arg.Any<int?>(),
+            Arg.Is<IEnumerable<string>>(select =>
+                select != null
+                && select.Contains("PartitionKey")
+                && select.Contains("RowKey")
+                && select.Contains("StartedAtUtc")),
+            Arg.Any<CancellationToken>());
     }
 }

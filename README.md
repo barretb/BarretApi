@@ -2250,7 +2250,7 @@ Some production environments restrict table creation at runtime. In that case, p
 
 ### Job Scheduler Configuration
 
-Before enabling the scheduler in production, ensure **at least one** of the following is configured:
+`JobSchedulerOptions` is validated with `.ValidateOnStart()`, so this configuration is required **before deploying this build at all** — whether or not `JobScheduler:Enabled` is `true`. A missing value fails application startup, taking down the entire API, not just the scheduler. Ensure **at least one** of the following is configured:
 - `JobScheduler__TableStorage__ConnectionString` — can reuse your existing Azure Storage account (same as LinkedIn, Blog Promotion, or Scheduled Posts if using one storage account).
 - `JobScheduler__TableStorage__AccountEndpoint` — set to your table storage account endpoint and configure managed identity. This option is not wired to an AppHost parameter; set it directly as an Azure App Service application setting.
 

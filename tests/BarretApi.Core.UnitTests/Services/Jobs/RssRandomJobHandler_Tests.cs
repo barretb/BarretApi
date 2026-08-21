@@ -40,6 +40,23 @@ public sealed class RssRandomJobHandler_Tests
             ]
         };
 
+    private static RssRandomPostResult CreatePartialResult()
+        => new()
+        {
+            SelectedEntry = new BlogFeedEntry
+            {
+                EntryIdentity = "entry-1",
+                Title = "A post",
+                CanonicalUrl = "https://example.com/post",
+                PublishedAtUtc = Now.AddDays(-3)
+            },
+            PlatformResults =
+            [
+                new PlatformPostResult { Platform = "bluesky", Success = true },
+                new PlatformPostResult { Platform = "mastodon", Success = false, ErrorMessage = "boom" }
+            ]
+        };
+
     [Fact]
     public void UsesTheExpectedJobType()
     {
@@ -102,7 +119,7 @@ public sealed class RssRandomJobHandler_Tests
     }
 
     [Fact]
-    public async Task Fails_GivenAPlatformFailed()
+    public async Task Fails_GivenEveryPlatformFailed()
     {
         _service.SelectAndPostAsync(Arg.Any<RssRandomPostQuery>(), Arg.Any<CancellationToken>())
             .Returns(CreateResult(success: false));
@@ -111,5 +128,19 @@ public sealed class RssRandomJobHandler_Tests
 
         result.Success.ShouldBeFalse();
         result.ErrorMessage!.ShouldContain("bluesky");
+    }
+
+    [Fact]
+    public async Task Succeeds_GivenOnlySomePlatformsFailed()
+    {
+        _service.SelectAndPostAsync(Arg.Any<RssRandomPostQuery>(), Arg.Any<CancellationToken>())
+            .Returns(CreatePartialResult());
+
+        var result = await CreateSut().ExecuteAsync(CreateContext());
+
+        result.Success.ShouldBeTrue();
+        result.Summary!.ShouldContain("bluesky");
+        result.Summary!.ShouldContain("mastodon");
+        result.Summary!.ShouldContain("boom");
     }
 }

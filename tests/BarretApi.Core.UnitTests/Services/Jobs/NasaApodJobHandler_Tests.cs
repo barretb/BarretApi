@@ -38,6 +38,26 @@ public sealed class NasaApodJobHandler_Tests
             ImageResized = false
         };
 
+    private static ApodPostResult CreatePartialResult()
+        => new()
+        {
+            ApodEntry = new ApodEntry
+            {
+                Title = "Pillars of Creation",
+                Date = new DateOnly(2026, 8, 20),
+                Explanation = "A nebula.",
+                Url = "https://apod.nasa.gov/apod/image/2608/pillars.jpg",
+                MediaType = ApodMediaType.Image
+            },
+            PlatformResults =
+            [
+                new PlatformPostResult { Platform = "bluesky", Success = true },
+                new PlatformPostResult { Platform = "mastodon", Success = false, ErrorMessage = "boom" }
+            ],
+            ImageAttached = true,
+            ImageResized = false
+        };
+
     [Fact]
     public void UsesTheExpectedJobType()
     {
@@ -85,7 +105,7 @@ public sealed class NasaApodJobHandler_Tests
     }
 
     [Fact]
-    public async Task Fails_GivenAPlatformFailed()
+    public async Task Fails_GivenEveryPlatformFailed()
     {
         _service.PostAsync(Arg.Any<DateOnly?>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(CreateResult(success: false));
@@ -93,5 +113,19 @@ public sealed class NasaApodJobHandler_Tests
         var result = await CreateSut().ExecuteAsync(CreateContext());
 
         result.Success.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Succeeds_GivenOnlySomePlatformsFailed()
+    {
+        _service.PostAsync(Arg.Any<DateOnly?>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(CreatePartialResult());
+
+        var result = await CreateSut().ExecuteAsync(CreateContext());
+
+        result.Success.ShouldBeTrue();
+        result.Summary!.ShouldContain("bluesky");
+        result.Summary!.ShouldContain("mastodon");
+        result.Summary!.ShouldContain("boom");
     }
 }
