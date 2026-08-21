@@ -18,7 +18,8 @@ public sealed class JobDispatcher(
     JobHandlerRegistry handlerRegistry,
     IOptions<JobSchedulerOptions> options,
     TimeProvider timeProvider,
-    ILogger<JobDispatcher> logger)
+    ILogger<JobDispatcher> logger,
+    IEmailNotificationService? emailNotificationService = null)
 {
     private readonly IScheduledJobRepository _jobRepository = jobRepository;
     private readonly IJobRunRepository _runRepository = runRepository;
@@ -26,6 +27,7 @@ public sealed class JobDispatcher(
     private readonly JobSchedulerOptions _options = options.Value;
     private readonly TimeProvider _timeProvider = timeProvider;
     private readonly ILogger<JobDispatcher> _logger = logger;
+    private readonly IEmailNotificationService? _emailNotificationService = emailNotificationService;
 
     /// <summary>
     /// Runs every job that is due. Returns how many were executed.
@@ -117,22 +119,58 @@ public sealed class JobDispatcher(
 
         var handler = _handlerRegistry.Resolve(job.JobType);
 
-        run.AttemptCount = 1;
-        JobExecutionResult result;
-        try
+        var maxAttempts = Math.Max(0, job.MaxRetryCount) + 1;
+        JobExecutionResult? result = null;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            result = await handler.ExecuteAsync(context, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Job {JobName} threw during execution.", job.Name);
-            result = JobExecutionResult.Fail(ex.Message);
+            run.AttemptCount = attempt;
+
+            try
+            {
+                result = await handler.ExecuteAsync(context, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                stopwatch.Stop();
+                _logger.LogWarning("Job {JobName} was cancelled during execution.", job.Name);
+                await CompleteRunAsync(
+                    job,
+                    run,
+                    JobRunStatus.Aborted,
+                    null,
+                    "Execution was cancelled before it completed.",
+                    stopwatch,
+                    CancellationToken.None);
+                return run;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Job {JobName} threw on attempt {Attempt}.", job.Name, attempt);
+                result = JobExecutionResult.Fail(ex.Message);
+            }
+
+            if (result.Success)
+            {
+                break;
+            }
+
+            if (attempt < maxAttempts)
+            {
+                await DelayBeforeRetryAsync(job, attempt, cancellationToken);
+            }
         }
 
         stopwatch.Stop();
 
-        var status = result.Success ? JobRunStatus.Succeeded : JobRunStatus.Failed;
+        var status = result!.Success ? JobRunStatus.Succeeded : JobRunStatus.Failed;
         await CompleteRunAsync(job, run, status, result.Summary, result.ErrorMessage, stopwatch, cancellationToken);
+
+        if (status == JobRunStatus.Failed)
+        {
+            await NotifyFailureAsync(job, run, cancellationToken);
+        }
+
         return run;
     }
 
@@ -203,13 +241,77 @@ public sealed class JobDispatcher(
             job.ConsecutiveFailureCount++;
         }
 
-        if (run.TriggerType == JobTriggerType.Scheduled)
+        if (run.TriggerType == JobTriggerType.Scheduled && status != JobRunStatus.Aborted)
         {
             job.NextRunUtc = ComputeNextRun(job, completedAt);
         }
 
         await _runRepository.AddAsync(run, cancellationToken);
         await _jobRepository.UpdateAsync(job, cancellationToken);
+    }
+
+    /// <summary>
+    /// Exponential backoff between attempts. A base delay of zero disables waiting,
+    /// which is what keeps the dispatcher tests fast.
+    /// </summary>
+    private async Task DelayBeforeRetryAsync(
+        ScheduledJobRecord job,
+        int attempt,
+        CancellationToken cancellationToken)
+    {
+        if (job.RetryBaseDelaySeconds <= 0)
+        {
+            return;
+        }
+
+        var seconds = job.RetryBaseDelaySeconds * Math.Pow(2, attempt - 1);
+        var delay = TimeSpan.FromSeconds(Math.Min(seconds, TimeSpan.FromMinutes(15).TotalSeconds));
+
+        _logger.LogInformation(
+            "Retrying job {JobName} in {DelaySeconds}s after attempt {Attempt}.",
+            job.Name,
+            delay.TotalSeconds,
+            attempt);
+
+        await Task.Delay(delay, _timeProvider, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sent only once every attempt has failed. Rate limiting lives inside the
+    /// notification service, so a permanently broken job cannot flood the inbox.
+    /// </summary>
+    private async Task NotifyFailureAsync(
+        ScheduledJobRecord job,
+        JobRunRecord run,
+        CancellationToken cancellationToken)
+    {
+        if (_emailNotificationService is null)
+        {
+            return;
+        }
+
+        var context = new Dictionary<string, string>
+        {
+            ["JobName"] = job.Name,
+            ["JobType"] = job.JobType,
+            ["RunId"] = run.RunId,
+            ["Attempts"] = run.AttemptCount.ToString(),
+            ["ConsecutiveFailures"] = job.ConsecutiveFailureCount.ToString(),
+            ["NextRunUtc"] = job.NextRunUtc?.ToString("O") ?? "none"
+        };
+
+        try
+        {
+            await _emailNotificationService.SendPostFailureNotificationAsync(
+                $"job:{job.Name}",
+                run.ErrorMessage ?? "The job failed without reporting an error message.",
+                context,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send a failure notification for job {JobName}.", job.Name);
+        }
     }
 
     /// <summary>
