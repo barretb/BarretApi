@@ -1,9 +1,11 @@
 using BarretApi.Api.Auth;
+using BarretApi.Api.Scheduling;
 using BarretApi.Api.Validation;
 using BarretApi.Core.Configuration;
 using BarretApi.Core.Interfaces;
 using BarretApi.Core.Models;
 using BarretApi.Core.Services;
+using BarretApi.Core.Services.Jobs;
 using BarretApi.Infrastructure.Bluesky;
 using BarretApi.Infrastructure.DiceBear;
 using BarretApi.Infrastructure.GitHub;
@@ -58,6 +60,12 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<TipOfDayOptions>>(
     new OptionsValidatorAdapter<TipOfDayOptions>(o => o.Validate()));
+builder.Services
+    .AddOptions<JobSchedulerOptions>()
+    .Bind(builder.Configuration.GetSection(JobSchedulerOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<JobSchedulerOptions>>(
+    new OptionsValidatorAdapter<JobSchedulerOptions>(o => o.Validate()));
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 
@@ -126,6 +134,20 @@ builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPr
 builder.Services.AddSingleton<IScheduledSocialPostRepository, AzureTableScheduledSocialPostRepository>();
 builder.Services.AddSingleton<IScheduledPostImageStore, AzureBlobScheduledPostImageStore>();
 builder.Services.AddSingleton<ITipOfDayRepository, AzureTableTipOfDayRepository>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IScheduledJobRepository, AzureTableScheduledJobRepository>();
+builder.Services.AddSingleton<IJobRunRepository, AzureTableJobRunRepository>();
+builder.Services.AddSingleton<IScheduledJobHandler, ProcessScheduledPostsJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, RssPromotionJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, RssRandomJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, TipOfDayJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, NasaApodJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, SatelliteJobHandler>();
+builder.Services.AddSingleton<IScheduledJobHandler, PurgeJobRunsJobHandler>();
+builder.Services.AddSingleton<JobHandlerRegistry>();
+builder.Services.AddSingleton<JobDispatcher>();
+builder.Services.AddSingleton<BuiltInJobSeeder>();
+builder.Services.AddHostedService<JobSchedulerHostedService>();
 builder.Services.AddSingleton<IEmailRateLimiter>(sp =>
 {
     var useAzureStorage = !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:ConnectionString"])
@@ -156,7 +178,9 @@ builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestra
 builder.Services.AddSingleton<IScheduledSocialPostProcessor, ScheduledSocialPostProcessor>();
 builder.Services.AddSingleton<SocialPostService>();
 builder.Services.AddSingleton<RssRandomPostService>();
+builder.Services.AddSingleton<IRssRandomPostService>(sp => sp.GetRequiredService<RssRandomPostService>());
 builder.Services.AddSingleton<TipOfDayService>();
+builder.Services.AddSingleton<ITipOfDayService>(sp => sp.GetRequiredService<TipOfDayService>());
 
 builder.Services.Configure<NasaApodOptions>(builder.Configuration.GetSection(NasaApodOptions.SectionName));
 builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
@@ -168,6 +192,7 @@ builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
 builder.Services.AddSingleton<INasaApodClient>(sp => sp.GetRequiredService<NasaApodClient>());
 builder.Services.AddSingleton<IImageResizer, SkiaImageResizer>();
 builder.Services.AddSingleton<NasaApodPostService>();
+builder.Services.AddSingleton<INasaApodPostService>(sp => sp.GetRequiredService<NasaApodPostService>());
 
 builder.Services.Configure<NasaGibsOptions>(builder.Configuration.GetSection(NasaGibsOptions.SectionName));
 builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
@@ -179,6 +204,7 @@ builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
 });
 builder.Services.AddSingleton<INasaGibsClient>(sp => sp.GetRequiredService<NasaGibsClient>());
 builder.Services.AddSingleton<NasaGibsPostService>();
+builder.Services.AddSingleton<INasaGibsPostService>(sp => sp.GetRequiredService<NasaGibsPostService>());
 
 builder.Services.AddHttpClient<DiceBearAvatarClient>(client =>
 {
@@ -221,6 +247,19 @@ builder.Services.Configure<HeroImageOptions>(o =>
 builder.Services.AddScoped<IHeroImageGenerator, SkiaHeroImageGenerator>();
 
 var app = builder.Build();
+
+// JobHandlerRegistry is registered as a singleton, so it is normally built lazily on first
+// use. Resolving it here forces its constructor to run at startup, so a duplicate or blank
+// JobType fails the app at boot instead of on the first tick or the first /api/jobs request.
+app.Services.GetRequiredService<JobHandlerRegistry>();
+
+// Seeds the built-in purge-job-runs definition if it is missing. Never overwrites an
+// existing row, so a paused or retuned job survives a restart. Seeding is best-effort:
+// bounded so a slow or unreachable table cannot delay startup (this app runs with Always
+// On, so a hung startup delays App Service marking the instance healthy). Storage and
+// timeout failures are both swallowed inside SeedAsync so the API still starts.
+using var seedTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+await app.Services.GetRequiredService<BuiltInJobSeeder>().SeedAsync(seedTimeout.Token);
 
 app.UseCors();
 app.UseAuthentication();

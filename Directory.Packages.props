@@ -13,6 +13,8 @@
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.1" />
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="System.ServiceModel.Syndication" Version="10.0.10" />
+    <!-- Job scheduling -->
+    <PackageVersion Include="Cronos" Version="0.11.0" />
     <!-- Image processing -->
     <PackageVersion Include="SkiaSharp" Version="4.150.1" />
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.150.1" />
@@ -35,5 +37,7 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="NSubstitute" Version="6.0.0" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.10" />
   </ItemGroup>
 </Project>
