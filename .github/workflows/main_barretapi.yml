@@ -16,6 +16,19 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
 
+# SECURITY — DO NOT ADD A pull_request TRIGGER TO THIS JOB.
+#
+# This repository is public and this workflow runs on a self-hosted runner.
+# A pull_request trigger would let anyone who forks the repo execute arbitrary
+# code on that runner: a root process, on a home LAN, sharing a Docker host with
+# other containers, able to mint Azure tokens through the OIDC federated
+# credential below. Both triggers here require write access to the repo, which
+# is the only reason a fork cannot start a job today.
+#
+# If you want PR validation, add a SEPARATE job with runs-on: ubuntu-latest.
+# Untrusted code belongs on disposable hosted infrastructure, never on this
+# runner. See:
+# https://docs.github.com/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#hardening-for-self-hosted-runners
 on:
   push:
     branches:

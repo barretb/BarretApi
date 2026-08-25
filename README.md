@@ -2200,6 +2200,14 @@ Two consequences worth knowing:
 
 The image installs the **Azure CLI** (the `INSTALL_AZURE_CLI` build arg on the service). This is not optional: `azure/login@v2` shells out to `az`, which GitHub-hosted images preinstall and a plain .NET SDK image does not, so the deploy fails with `Unable to locate executable file: az` without it. The arg defaults to false so the DungeonHostv4 runner, which never deploys, does not carry it.
 
+#### Public repository: keep untrusted code off this runner
+
+This repository is public, so anyone can fork it and open a pull request. The workflow triggers only on `push` to `main` and `workflow_dispatch`, both of which require write access — that is the only reason a fork cannot start a job on the runner.
+
+**Do not add a `pull_request` trigger to the self-hosted job.** It would let a stranger run arbitrary code as root on a machine that sits on a home LAN, shares a Docker host with other containers, and can mint Azure tokens through the OIDC federated credential. If PR validation is wanted, add a separate job with `runs-on: ubuntu-latest` and leave the deploy job where it is.
+
+Supporting settings: fork PR workflows require approval for all external contributors, and the default workflow permission is read. The runner is not ephemeral — its workspace and NuGet cache persist between jobs — so anything that did execute could outlive the run that started it.
+
 The container carries no Docker socket. If CI ever needs to run the Testcontainers-based integration tests, mount `/var/run/docker.sock` into the service the way the DungeonHostv4 runner does.
 ## Production Notes
 
