@@ -51,6 +51,100 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
 		}
 	}
 
+	internal AzureTableScheduledSocialPostRepository(
+		TableClient tableClient, TableServiceClient tableServiceClient,
+		IOptions<ScheduledSocialPostOptions> options,
+		ILogger<AzureTableScheduledSocialPostRepository> logger)
+	{
+		_tableClient = tableClient;
+		_tableServiceClient = tableServiceClient;
+		_options = options.Value;
+		_logger = logger;
+		_tableName = _options.TableStorage.TableName;
+		_initialized = true;
+	}
+
+	public async Task<ScheduledSocialPostRecord?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(id);
+		await EnsureInitializedAsync(cancellationToken);
+		var response = await _tableClient.GetEntityIfExistsAsync<TableEntity>(
+			_options.TableStorage.PartitionKey, id, cancellationToken: cancellationToken);
+		return response.HasValue && response.Value is not null ? MapEntityToModel(response.Value) : null;
+	}
+
+	public async Task<ScheduledPostsPage> ListAsync(ScheduledPostsQuery query, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(query);
+		ArgumentOutOfRangeException.ThrowIfLessThan(query.PageSize, 1);
+		ArgumentOutOfRangeException.ThrowIfGreaterThan(query.PageSize, 100);
+		if ((query.Status.HasValue && !Enum.IsDefined(query.Status.Value))
+			|| (query.FromUtc.HasValue && query.ToUtc.HasValue && query.FromUtc > query.ToUtc))
+		{
+			throw new ArgumentException("Invalid status or scheduled date range.");
+		}
+
+		await EnsureInitializedAsync(cancellationToken);
+		var filter = BuildListFilter(query);
+		try
+		{
+			var pages = _tableClient.QueryAsync<TableEntity>(filter, maxPerPage: query.PageSize, cancellationToken: cancellationToken)
+				.AsPages(query.ContinuationToken, query.PageSize);
+			await foreach (var page in pages.WithCancellation(cancellationToken))
+			{
+				return new ScheduledPostsPage(page.Values.Select(MapEntityToModel).ToList(), page.ContinuationToken);
+			}
+
+			return new ScheduledPostsPage([], null);
+		}
+		catch (RequestFailedException ex) when (ex.Status == 400)
+		{
+			throw new ArgumentException("The query or continuation token is invalid.", nameof(query), ex);
+		}
+	}
+
+	public async Task<bool> TryUpdateAsync(ScheduledSocialPostRecord record, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(record);
+		ArgumentException.ThrowIfNullOrWhiteSpace(record.Version);
+		if (record.Version == "*")
+		{
+			throw new ArgumentException("Wildcard versions are not permitted.");
+		}
+
+		await EnsureInitializedAsync(cancellationToken);
+		try
+		{
+			await SaveClaimAsync(record, cancellationToken);
+			return true;
+		}
+		catch (RequestFailedException ex) when (ex.Status is 404 or 412)
+		{
+			return false;
+		}
+	}
+
+	private string BuildListFilter(ScheduledPostsQuery query)
+	{
+		var filter = TableClient.CreateQueryFilter($"PartitionKey eq {_options.TableStorage.PartitionKey}");
+		if (query.Status.HasValue)
+		{
+			filter += " and " + TableClient.CreateQueryFilter($"Status eq {query.Status.Value.ToString()}");
+		}
+
+		if (query.FromUtc.HasValue)
+		{
+			filter += " and " + TableClient.CreateQueryFilter($"ScheduledForUtc ge {query.FromUtc.Value.ToUniversalTime()}");
+		}
+
+		if (query.ToUtc.HasValue)
+		{
+			filter += " and " + TableClient.CreateQueryFilter($"ScheduledForUtc le {query.ToUtc.Value.ToUniversalTime()}");
+		}
+
+		return filter;
+	}
+
 	public async Task SaveScheduledAsync(
 		ScheduledSocialPostRecord record,
 		CancellationToken cancellationToken = default)
@@ -230,8 +324,24 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
 			["AttemptCount"] = record.AttemptCount,
 			["AutoThread"] = record.AutoThread,
 			["DeliveryTrackingEnabled"] = record.DeliveryTrackingEnabled,
-			["DeliveryResults"] = JsonSerializer.Serialize(record.DeliveryResults, JsonOptions)
+			["DeliveryResults"] = JsonSerializer.Serialize(record.DeliveryResults, JsonOptions),
+			["DeliveryConfirmations"] = JsonSerializer.Serialize(record.DeliveryConfirmations, JsonOptions)
 		};
+
+		if (record.UpdatedAtUtc.HasValue)
+		{
+			entity["UpdatedAtUtc"] = record.UpdatedAtUtc.Value;
+		}
+
+		if (record.LastManagementAction is not null)
+		{
+			entity["LastManagementAction"] = record.LastManagementAction;
+		}
+
+		if (record.ManagementNote is not null)
+		{
+			entity["ManagementNote"] = record.ManagementNote;
+		}
 
 		if (record.LeaseExpiresAtUtc.HasValue)
 		{
@@ -286,7 +396,11 @@ public sealed class AzureTableScheduledSocialPostRepository : IScheduledSocialPo
 			DeliveryTrackingEnabled = entity.GetBoolean("DeliveryTrackingEnabled") ?? false,
 			DeliveryResults = DeserializeList<PlatformPostResult>(entity.GetString("DeliveryResults")),
 			LeaseExpiresAtUtc = entity.GetDateTimeOffset("LeaseExpiresAtUtc"),
-			Version = entity.ETag.ToString()
+			Version = entity.ETag.ToString(),
+			UpdatedAtUtc = entity.Timestamp ?? entity.GetDateTimeOffset("UpdatedAtUtc"),
+			LastManagementAction = entity.GetString("LastManagementAction"),
+			ManagementNote = entity.GetString("ManagementNote"),
+			DeliveryConfirmations = DeserializeList<PostDeliveryConfirmation>(entity.GetString("DeliveryConfirmations"))
 		};
 	}
 

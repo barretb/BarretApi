@@ -179,6 +179,7 @@ builder.Services.AddSingleton<IEmailNotificationService, SmtpEmailNotificationSe
 builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
 builder.Services.AddSingleton<IScheduledSocialPostProcessor, ScheduledSocialPostProcessor>();
 builder.Services.AddSingleton<SocialPostService>();
+builder.Services.AddSingleton<ScheduledPostManagementService>();
 builder.Services.AddSingleton<RssRandomPostService>();
 builder.Services.AddSingleton<IRssRandomPostService>(sp => sp.GetRequiredService<RssRandomPostService>());
 builder.Services.AddSingleton<TipOfDayService>();
