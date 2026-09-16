@@ -89,9 +89,11 @@ Swagger UI is available in development at the root URL when running the API.
 
 All mutating endpoints require an API key passed via the `X-Api-Key` header. The key is configured in the Aspire AppHost as the `Auth:ApiKey` parameter.
 
-The LinkedIn OAuth endpoints (`/api/linkedin/auth`, `/api/linkedin/auth/callback`, `/api/linkedin/profile`) are **anonymous** — they do not require an API key.
+Starting either OAuth flow (`/api/linkedin/auth` or `/api/github/auth`) requires `X-Api-Key`. Callback and profile endpoints remain anonymous. All other GitHub endpoints require the API key.
 
-The GitHub OAuth endpoints (`/api/github/auth`, `/api/github/auth/callback`, `/api/github/profile`) are also **anonymous** — they do not require an API key. All other GitHub endpoints require the `X-Api-Key` header.
+OAuth setup must start and finish in the same HTTPS browser session. Each authorization request sets a Secure, HttpOnly, SameSite=Lax cookie and a provider-specific, single-use state that expires after ten minutes. Missing, mismatched, expired, or replayed state is rejected with HTTP 400 before any token exchange. A new setup attempt for the same provider in the same browser replaces the previous cookie.
+
+Pending OAuth state is held in memory: restarting the API requires restarting authorization. With multiple replicas, route setup and callback to the same instance using session affinity; a callback on another replica fails closed.
 
 ## API Endpoints
 
@@ -115,6 +117,7 @@ Creates a cross-platform social post. Images are supplied as URL references and 
 | `platforms` | `string[]` | No | Target platforms: `bluesky`, `mastodon`, `linkedin`. |
 | `scheduledFor` | `string` (ISO 8601) | No | Future UTC datetime for deferred posting. When set, request is queued and not published immediately. |
 | `autoThread` | `boolean` | No | When `true`, text exceeding the platform character limit is automatically split into a reply-chain thread. Defaults to `false`. |
+| `dryRun` | `boolean` | No | Preview prepared text without publishing or scheduling. With `autoThread`, returns the same text segments used by publishing. Defaults to `false`. |
 | `images` | `object[]` | No | Up to 4 image references. |
 | `images[].url` | `string` | Yes | Absolute URL of the image. |
 | `images[].altText` | `string` | Yes | Alt text for the image (max 1,500 chars). |
@@ -177,6 +180,19 @@ POST /api/social-posts
   "text": "This is a very long post that exceeds the platform character limit. When autoThread is enabled, the text is automatically split into multiple segments and posted as a reply chain. Each segment breaks at paragraph or word boundaries for readability.",
   "platforms": ["bluesky", "mastodon"],
   "autoThread": true
+}
+```
+
+#### Preview Without Publishing
+
+Set `dryRun: true` on the JSON endpoint to preview shortened text or thread segments. This takes precedence over `scheduledFor`. The response has `dryRun: true`, `postedAt: null`, and `scheduled: false`. Thread previews include `threadedPosts` with prepared text but no published IDs or URLs. Preview retrieves platform limits; it does not download, upload, or validate image bytes.
+
+```json
+{
+  "text": "Your announcement text...",
+  "platforms": ["bluesky", "mastodon"],
+  "autoThread": true,
+  "dryRun": true
 }
 ```
 
@@ -446,6 +462,16 @@ Processes scheduled posts that are due (`scheduledFor <= now`), posts them to co
 |---|---|
 | **Auth** | `X-Api-Key` header |
 | **Content-Type** | `application/json` |
+
+#### Delivery Recovery
+
+Scheduled records retain `autoThread` and the target platforms selected when scheduled. Each platform result is saved before the next platform is attempted. Subsequent runs skip successful deliveries and retry confirmed failures, such as rate limits or image preparation failures. A failure in one record or its notification does not stop the remaining batch.
+
+Processing uses optimistic concurrency and a 15-minute claim, renewed before each platform attempt. Each attempt has a five-minute cancellation timeout. The next processing run moves expired claims to `NeedsReview`, returning `DELIVERY_UNCERTAIN` in the run's failures. Partial threads and ambiguous provider failures also require review: a timeout or interrupted process may have occurred after a post was accepted. Automatic HTTP retries for publishing methods are disabled.
+
+There is no automatic replay or management endpoint for `NeedsReview` yet. Inspect the platform and stored `DeliveryResults` first. After confirming all deliveries, an operator can mark the stored record `Published`. To retry a confirmed non-delivery, preserve successful receipts, set `DeliveryTrackingEnabled` to `true`, clear `LeaseExpiresAtUtc`, and set `Status` to `Failed`. Complete partially published threads manually instead of replaying the whole thread.
+
+Legacy pending records remain supported (`autoThread` defaults to `false` because it was not previously stored). Legacy failed records without delivery tracking require review before retrying; their earlier successful deliveries cannot be inferred safely. These safeguards do not promise exactly-once delivery across a remote provider and local storage.
 
 #### Request Body
 
@@ -1135,28 +1161,35 @@ See **[docs/JOB_SCHEDULER.md](docs/JOB_SCHEDULER.md)** for the full endpoint ref
 
 ### GET /api/linkedin/auth — Initiate LinkedIn OAuth Flow
 
-Starts the LinkedIn OAuth 2.0 authorization flow. Open this URL directly in a **browser** to be redirected to LinkedIn's consent screen. When called from a non-browser API client, returns a JSON object with the authorization URL.
+Starts the LinkedIn OAuth authorization flow. Call with the API key from the same HTTPS browser session that will receive the callback. Requests accepting HTML redirect to the provider; JSON requests return an authorization URL.
 
 | Detail | Value |
 |---|---|
-| **Auth** | None (anonymous) |
+| **Auth** | `X-Api-Key` header |
 
 #### Example — Browser
 
-Navigate to:
+From a page on your API's HTTPS origin, run this in the browser developer console. The browser retains the correlation cookie while navigating to LinkedIn:
 
+```javascript
+const response = await fetch("/api/linkedin/auth", {
+  headers: { "X-Api-Key": prompt("API key"), "Accept": "application/json" },
+  credentials: "same-origin"
+});
+if (!response.ok) throw new Error("OAuth setup failed");
+const { authUrl } = await response.json();
+window.location.assign(authUrl);
 ```
-https://<your-api-host>/api/linkedin/auth
-```
-
-You will be redirected to LinkedIn to authorize the application.
 
 #### Example — API Client
 
 ```http
 GET /api/linkedin/auth
+X-Api-Key: YOUR_API_KEY
 Accept: application/json
 ```
+
+The callback must include the cookie issued to this client. Copying only the authorization URL into a different browser will fail. Prefer the browser example above for interactive setup.
 
 #### Response — 200 OK (API Client)
 
@@ -1183,7 +1216,7 @@ This endpoint is called automatically by LinkedIn after authorization. You do no
 | Parameter | Description |
 |---|---|
 | `code` | Authorization code from LinkedIn. |
-| `state` | State parameter for CSRF protection. |
+| `state` | Required, single-use value from setup; must match the initiating browser cookie and provider within ten minutes. |
 | `error` | Error code if authorization was denied. |
 | `error_description` | Human-readable error description. |
 
@@ -1530,28 +1563,35 @@ Binary image data with the appropriate `Content-Type` header:
 
 ### GET /api/github/auth — Initiate GitHub OAuth Flow
 
-Starts the GitHub OAuth authorization flow. Open this URL directly in a **browser** to be redirected to GitHub's consent screen. When called from a non-browser API client, returns a JSON object with the authorization URL.
+Starts the GitHub OAuth authorization flow. Call with the API key from the same HTTPS browser session that will receive the callback. Requests accepting HTML redirect to the provider; JSON requests return an authorization URL.
 
 | Detail | Value |
 |---|---|
-| **Auth** | None (anonymous) |
+| **Auth** | `X-Api-Key` header |
 
 #### Example — Browser
 
-Navigate to:
+From a page on your API's HTTPS origin, run this in the browser developer console. The browser retains the correlation cookie while navigating to GitHub:
 
+```javascript
+const response = await fetch("/api/github/auth", {
+  headers: { "X-Api-Key": prompt("API key"), "Accept": "application/json" },
+  credentials: "same-origin"
+});
+if (!response.ok) throw new Error("OAuth setup failed");
+const { authUrl } = await response.json();
+window.location.assign(authUrl);
 ```
-https://<your-api-host>/api/github/auth
-```
-
-You will be redirected to GitHub to authorize the application.
 
 #### Example — API Client
 
 ```http
 GET /api/github/auth
+X-Api-Key: YOUR_API_KEY
 Accept: application/json
 ```
+
+The callback must include the cookie issued to this client. Copying only the authorization URL into a different browser will fail. Prefer the browser example above for interactive setup.
 
 #### Response — 200 OK (API Client)
 
@@ -1578,7 +1618,7 @@ This endpoint is called automatically by GitHub after authorization. You do not 
 | Parameter | Description |
 |---|---|
 | `code` | Authorization code from GitHub. |
-| `state` | State parameter for CSRF protection. |
+| `state` | Required, single-use value from setup; must match the initiating browser cookie and provider within ten minutes. |
 | `error` | Error code if authorization was denied. |
 | `error_description` | Human-readable error description. |
 
@@ -2193,6 +2233,8 @@ Rate limiting is **always active** when email notifications are enabled. No addi
 
 ## Deployment
 
+The deployment workflow runs the solution tests in Release configuration before publishing. A failing test prevents deployment.
+
 Pushing to `main` builds, publishes, and deploys the API to the `barretapi` Azure Web App via `.github/workflows/main_barretapi.yml`. The workflow can also be triggered by hand with `workflow_dispatch`. Azure authentication uses OIDC federated credentials (`azure/login@v2`) — there is no publish profile or password secret, only the client/tenant/subscription IDs.
 
 Build and deploy are a single job. They were split so the publish output could cross between two GitHub-hosted runners as an artifact; both halves now run on the same machine, so that upload/download round-trip was removed.
@@ -2265,7 +2307,7 @@ The Power Automate flows this scheduler replaces are being retired incrementally
 ### LinkedIn Rollout Checklist
 
 1. Add LinkedIn configuration values to deployment settings before enabling LinkedIn in client requests.
-2. Complete the OAuth flow by visiting `/api/linkedin/auth` in a browser and authorizing the application.
+2. Complete the authenticated browser setup described under [LinkedIn OAuth](#get-apilinkedinauth--initiate-linkedin-oauth-flow), then authorize the application.
 3. Retrieve your profile URN from `/api/linkedin/profile` and set `LinkedIn:AuthorUrn` to `urn:li:person:<sub>`.
 4. Validate with a `linkedin`-only request first, then test mixed-platform requests.
 5. Confirm mixed-platform failure handling returns `207` when LinkedIn fails and another platform succeeds.

@@ -52,6 +52,9 @@ jobs:
       - name: Build API project
         run: dotnet build ${{ env.API_PROJECT_PATH }} --configuration Release --no-restore
 
+      - name: Test solution before publishing
+        run: dotnet test BarretApi.slnx --configuration Release
+
       # --cleanDestinationDir has no dotnet equivalent and the runner workspace
       # persists between runs, so clear stale output rather than publishing over
       # the top of a previous run's files.

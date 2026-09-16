@@ -1,4 +1,4 @@
-using BarretApi.Api.Auth;
+﻿using BarretApi.Api.Auth;
 using BarretApi.Api.Scheduling;
 using BarretApi.Api.Validation;
 using BarretApi.Core.Configuration;
@@ -24,94 +24,96 @@ builder.AddServiceDefaults();
 
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    });
+	options.AddDefaultPolicy(policy =>
+	{
+		policy
+			.AllowAnyOrigin()
+			.AllowAnyMethod()
+			.AllowAnyHeader();
+	});
 });
 
 builder.Services.Configure<BlueskyOptions>(builder.Configuration.GetSection(BlueskyOptions.SectionName));
 builder.Services.Configure<MastodonOptions>(builder.Configuration.GetSection(MastodonOptions.SectionName));
 builder.Services.Configure<ApiKeyOptions>(builder.Configuration.GetSection(ApiKeyOptions.SectionName));
 builder.Services
-    .AddOptions<LinkedInOptions>()
-    .Bind(builder.Configuration.GetSection(LinkedInOptions.SectionName))
-    .ValidateOnStart();
+	.AddOptions<LinkedInOptions>()
+	.Bind(builder.Configuration.GetSection(LinkedInOptions.SectionName))
+	.ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<LinkedInOptions>>(
-    new OptionsValidatorAdapter<LinkedInOptions>(o => o.Validate()));
+	new OptionsValidatorAdapter<LinkedInOptions>(o => o.Validate()));
 builder.Services
-    .AddOptions<BlogPromotionOptions>()
-    .Bind(builder.Configuration.GetSection(BlogPromotionOptions.SectionName))
-    .ValidateOnStart();
+	.AddOptions<BlogPromotionOptions>()
+	.Bind(builder.Configuration.GetSection(BlogPromotionOptions.SectionName))
+	.ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<BlogPromotionOptions>>(
-    new OptionsValidatorAdapter<BlogPromotionOptions>(o => o.Validate()));
+	new OptionsValidatorAdapter<BlogPromotionOptions>(o => o.Validate()));
 builder.Services
-    .AddOptions<ScheduledSocialPostOptions>()
-    .Bind(builder.Configuration.GetSection(ScheduledSocialPostOptions.SectionName))
-    .ValidateOnStart();
+	.AddOptions<ScheduledSocialPostOptions>()
+	.Bind(builder.Configuration.GetSection(ScheduledSocialPostOptions.SectionName))
+	.ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<ScheduledSocialPostOptions>>(
-    new OptionsValidatorAdapter<ScheduledSocialPostOptions>(o => o.Validate()));
+	new OptionsValidatorAdapter<ScheduledSocialPostOptions>(o => o.Validate()));
 builder.Services
-    .AddOptions<TipOfDayOptions>()
-    .Bind(builder.Configuration.GetSection(TipOfDayOptions.SectionName))
-    .ValidateOnStart();
+	.AddOptions<TipOfDayOptions>()
+	.Bind(builder.Configuration.GetSection(TipOfDayOptions.SectionName))
+	.ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<TipOfDayOptions>>(
-    new OptionsValidatorAdapter<TipOfDayOptions>(o => o.Validate()));
+	new OptionsValidatorAdapter<TipOfDayOptions>(o => o.Validate()));
 builder.Services
-    .AddOptions<JobSchedulerOptions>()
-    .Bind(builder.Configuration.GetSection(JobSchedulerOptions.SectionName))
-    .ValidateOnStart();
+	.AddOptions<JobSchedulerOptions>()
+	.Bind(builder.Configuration.GetSection(JobSchedulerOptions.SectionName))
+	.ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<JobSchedulerOptions>>(
-    new OptionsValidatorAdapter<JobSchedulerOptions>(o => o.Validate()));
+	new OptionsValidatorAdapter<JobSchedulerOptions>(o => o.Validate()));
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 
 builder.Services
-    .AddAuthentication(ApiKeyAuthHandler.SchemeName)
-    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthHandler>(ApiKeyAuthHandler.SchemeName, null);
+	.AddAuthentication(ApiKeyAuthHandler.SchemeName)
+	.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthHandler>(ApiKeyAuthHandler.SchemeName, null);
 
 builder.Services.AddAuthorization();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<OAuthStateService>();
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(options =>
 {
-    options.DocumentSettings = settings =>
-    {
-        settings.Title = "BarretApi";
-        settings.Version = "v1";
-    };
+	options.DocumentSettings = settings =>
+	{
+		settings.Title = "BarretApi";
+		settings.Version = "v1";
+	};
 });
 
 builder.Services.AddHttpClient<BlueskyClient>(client =>
 {
-    client.BaseAddress = new Uri(
-        builder.Configuration["Bluesky:ServiceUrl"] ?? "https://bsky.social");
+	client.BaseAddress = new Uri(
+		builder.Configuration["Bluesky:ServiceUrl"] ?? "https://bsky.social");
 });
 
 builder.Services.AddHttpClient<MastodonClient>((sp, client) =>
 {
-    var mastodonOptions = builder.Configuration.GetSection(MastodonOptions.SectionName);
-    client.BaseAddress = new Uri(mastodonOptions["InstanceUrl"] ?? "https://mastodon.social");
+	var mastodonOptions = builder.Configuration.GetSection(MastodonOptions.SectionName);
+	client.BaseAddress = new Uri(mastodonOptions["InstanceUrl"] ?? "https://mastodon.social");
 });
 
 builder.Services.AddHttpClient<LinkedInClient>((sp, client) =>
 {
-    var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
-    client.BaseAddress = new Uri(linkedInOptions["ApiBaseUrl"] ?? "https://api.linkedin.com");
+	var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
+	client.BaseAddress = new Uri(linkedInOptions["ApiBaseUrl"] ?? "https://api.linkedin.com");
 });
 
 builder.Services.AddHttpClient<LinkedInTokenProvider>((sp, client) =>
 {
-    var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
-    client.BaseAddress = new Uri(linkedInOptions["OAuthBaseUrl"] ?? "https://www.linkedin.com");
+	var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
+	client.BaseAddress = new Uri(linkedInOptions["OAuthBaseUrl"] ?? "https://www.linkedin.com");
 });
 
 builder.Services.AddHttpClient("LinkedInOAuth", (sp, client) =>
 {
-    var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
-    client.BaseAddress = new Uri(linkedInOptions["OAuthBaseUrl"] ?? "https://www.linkedin.com");
+	var linkedInOptions = builder.Configuration.GetSection(LinkedInOptions.SectionName);
+	client.BaseAddress = new Uri(linkedInOptions["OAuthBaseUrl"] ?? "https://www.linkedin.com");
 });
 
 builder.Services.AddSingleton<ILinkedInTokenStore, AzureTableLinkedInTokenStore>();
@@ -120,16 +122,16 @@ builder.Services.AddHttpClient<ImageDownloadService>();
 builder.Services.AddHttpClient<IBlogFeedReader, RssBlogFeedReader>();
 
 builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
-    sp.GetRequiredService<BlueskyClient>());
+	sp.GetRequiredService<BlueskyClient>());
 builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
-    sp.GetRequiredService<MastodonClient>());
+	sp.GetRequiredService<MastodonClient>());
 builder.Services.AddSingleton<ISocialPlatformClient>(sp =>
-    sp.GetRequiredService<LinkedInClient>());
+	sp.GetRequiredService<LinkedInClient>());
 builder.Services.AddSingleton<ITextShorteningService, TextShorteningService>();
 builder.Services.AddSingleton<ITextSplitterService, TextSplitterService>();
 builder.Services.AddSingleton<IHashtagService, HashtagService>();
 builder.Services.AddSingleton<IImageDownloadService>(sp =>
-    sp.GetRequiredService<ImageDownloadService>());
+	sp.GetRequiredService<ImageDownloadService>());
 builder.Services.AddSingleton<IBlogPostPromotionRepository, AzureTableBlogPostPromotionRepository>();
 builder.Services.AddSingleton<IScheduledSocialPostRepository, AzureTableScheduledSocialPostRepository>();
 builder.Services.AddSingleton<IScheduledPostImageStore, AzureBlobScheduledPostImageStore>();
@@ -150,28 +152,28 @@ builder.Services.AddSingleton<BuiltInJobSeeder>();
 builder.Services.AddHostedService<JobSchedulerHostedService>();
 builder.Services.AddSingleton<IEmailRateLimiter>(sp =>
 {
-    var useAzureStorage = !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:ConnectionString"])
-        || !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:AccountEndpoint"]);
+	var useAzureStorage = !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:ConnectionString"])
+		|| !string.IsNullOrWhiteSpace(builder.Configuration["ScheduledSocialPosts:TableStorage:AccountEndpoint"]);
 
-    if (useAzureStorage)
-    {
-        var scheduledPostOptions = sp.GetRequiredService<IOptions<ScheduledSocialPostOptions>>();
-        var connectionString = scheduledPostOptions.Value.TableStorage.ConnectionString;
-        var accountEndpoint = scheduledPostOptions.Value.TableStorage.AccountEndpoint;
+	if (useAzureStorage)
+	{
+		var scheduledPostOptions = sp.GetRequiredService<IOptions<ScheduledSocialPostOptions>>();
+		var connectionString = scheduledPostOptions.Value.TableStorage.ConnectionString;
+		var accountEndpoint = scheduledPostOptions.Value.TableStorage.AccountEndpoint;
 
-        var tableServiceClient = !string.IsNullOrWhiteSpace(connectionString)
-            ? new Azure.Data.Tables.TableServiceClient(connectionString)
-            : new Azure.Data.Tables.TableServiceClient(
-                new Uri(accountEndpoint),
-                new Azure.Identity.DefaultAzureCredential());
+		var tableServiceClient = !string.IsNullOrWhiteSpace(connectionString)
+			? new Azure.Data.Tables.TableServiceClient(connectionString)
+			: new Azure.Data.Tables.TableServiceClient(
+				new Uri(accountEndpoint),
+				new Azure.Identity.DefaultAzureCredential());
 
-        return new AzureTableEmailRateLimiter(
-            tableServiceClient,
-            sp.GetRequiredService<ILogger<AzureTableEmailRateLimiter>>());
-    }
+		return new AzureTableEmailRateLimiter(
+			tableServiceClient,
+			sp.GetRequiredService<ILogger<AzureTableEmailRateLimiter>>());
+	}
 
-    return new InMemoryEmailRateLimiter(
-        sp.GetRequiredService<ILogger<InMemoryEmailRateLimiter>>());
+	return new InMemoryEmailRateLimiter(
+		sp.GetRequiredService<ILogger<InMemoryEmailRateLimiter>>());
 });
 builder.Services.AddSingleton<IEmailNotificationService, SmtpEmailNotificationService>();
 builder.Services.AddSingleton<IBlogPromotionOrchestrator, BlogPromotionOrchestrator>();
@@ -185,9 +187,9 @@ builder.Services.AddSingleton<ITipOfDayService>(sp => sp.GetRequiredService<TipO
 builder.Services.Configure<NasaApodOptions>(builder.Configuration.GetSection(NasaApodOptions.SectionName));
 builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
 {
-    var nasaOptions = builder.Configuration.GetSection(NasaApodOptions.SectionName);
-    client.BaseAddress = new Uri(nasaOptions["BaseUrl"] ?? "https://api.nasa.gov");
-    client.Timeout = TimeSpan.FromSeconds(15);
+	var nasaOptions = builder.Configuration.GetSection(NasaApodOptions.SectionName);
+	client.BaseAddress = new Uri(nasaOptions["BaseUrl"] ?? "https://api.nasa.gov");
+	client.Timeout = TimeSpan.FromSeconds(15);
 });
 builder.Services.AddSingleton<INasaApodClient>(sp => sp.GetRequiredService<NasaApodClient>());
 builder.Services.AddSingleton<IImageResizer, SkiaImageResizer>();
@@ -197,10 +199,10 @@ builder.Services.AddSingleton<INasaApodPostService>(sp => sp.GetRequiredService<
 builder.Services.Configure<NasaGibsOptions>(builder.Configuration.GetSection(NasaGibsOptions.SectionName));
 builder.Services.AddHttpClient<NasaGibsClient>((sp, client) =>
 {
-    var gibsOptions = builder.Configuration.GetSection(NasaGibsOptions.SectionName);
-    client.BaseAddress = new Uri(
-        gibsOptions["BaseUrl"] ?? "https://wvs.earthdata.nasa.gov");
-    client.Timeout = TimeSpan.FromSeconds(30);
+	var gibsOptions = builder.Configuration.GetSection(NasaGibsOptions.SectionName);
+	client.BaseAddress = new Uri(
+		gibsOptions["BaseUrl"] ?? "https://wvs.earthdata.nasa.gov");
+	client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddSingleton<INasaGibsClient>(sp => sp.GetRequiredService<NasaGibsClient>());
 builder.Services.AddSingleton<NasaGibsPostService>();
@@ -208,15 +210,15 @@ builder.Services.AddSingleton<INasaGibsPostService>(sp => sp.GetRequiredService<
 
 builder.Services.AddHttpClient<DiceBearAvatarClient>(client =>
 {
-    client.BaseAddress = new Uri("https://api.dicebear.com/");
-    client.Timeout = TimeSpan.FromSeconds(15);
+	client.BaseAddress = new Uri("https://api.dicebear.com/");
+	client.Timeout = TimeSpan.FromSeconds(15);
 });
 builder.Services.AddSingleton<IDiceBearAvatarClient>(sp =>
-    sp.GetRequiredService<DiceBearAvatarClient>());
+	sp.GetRequiredService<DiceBearAvatarClient>());
 
 builder.Services.AddHttpClient<AngleSharpHtmlTextExtractor>();
 builder.Services.AddSingleton<IHtmlTextExtractor>(sp =>
-    sp.GetRequiredService<AngleSharpHtmlTextExtractor>());
+	sp.GetRequiredService<AngleSharpHtmlTextExtractor>());
 builder.Services.AddSingleton<IWordCloudGenerator, SkiaWordCloudGenerator>();
 builder.Services.AddSingleton<TextAnalysisService>();
 
@@ -229,20 +231,20 @@ builder.Services.AddSingleton<IGitHubRepositoryStore, AzureTableGitHubRepository
 builder.Services.AddSingleton<GitHubTokenProvider>();
 builder.Services.AddHttpClient<IGitHubClient, GitHubClient>((sp, client) =>
 {
-    var gitHubOptions = builder.Configuration.GetSection(GitHubOptions.SectionName);
-    client.BaseAddress = new Uri(gitHubOptions["ApiBaseUrl"] ?? "https://api.github.com");
-    client.DefaultRequestHeaders.Add("User-Agent", "BarretApi");
-    client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
-    client.DefaultRequestHeaders.Accept.Add(
-        new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+	var gitHubOptions = builder.Configuration.GetSection(GitHubOptions.SectionName);
+	client.BaseAddress = new Uri(gitHubOptions["ApiBaseUrl"] ?? "https://api.github.com");
+	client.DefaultRequestHeaders.Add("User-Agent", "BarretApi");
+	client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+	client.DefaultRequestHeaders.Accept.Add(
+		new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 });
 
 builder.Services.Configure<HeroImageOptions>(o =>
 {
-    var contentRoot = builder.Environment.ContentRootPath;
-    o.FaceImagePath = Path.Combine(contentRoot, "images", "barretcircle2.png");
-    o.LogoImagePath = Path.Combine(contentRoot, "images", "barret-blake-logo-1024.png");
-    o.DefaultBackgroundPath = Path.Combine(contentRoot, "images", "generic-background.jpg");
+	var contentRoot = builder.Environment.ContentRootPath;
+	o.FaceImagePath = Path.Combine(contentRoot, "images", "barretcircle2.png");
+	o.LogoImagePath = Path.Combine(contentRoot, "images", "barret-blake-logo-1024.png");
+	o.DefaultBackgroundPath = Path.Combine(contentRoot, "images", "generic-background.jpg");
 });
 builder.Services.AddScoped<IHeroImageGenerator, SkiaHeroImageGenerator>();
 
@@ -268,7 +270,7 @@ app.UseFastEndpoints();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwaggerGen();
+	app.UseSwaggerGen();
 }
 
 app.MapDefaultEndpoints();
