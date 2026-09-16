@@ -1,5 +1,14 @@
+﻿using BarretApi.Api.Auth;
+using BarretApi.Api.Features.GitHub;
+using BarretApi.Api.Features.LinkedInAuth;
+using BarretApi.Core.Configuration;
 using BarretApi.Core.Interfaces;
 using BarretApi.Core.Models;
+using FastEndpoints;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Shouldly;
 
@@ -7,55 +16,59 @@ namespace BarretApi.Api.UnitTests.Features.GitHub;
 
 public sealed class GitHubAuthCallbackEndpoint_Tests
 {
-    private readonly IGitHubClient _gitHubClient = Substitute.For<IGitHubClient>();
-    private readonly IGitHubTokenStore _tokenStore = Substitute.For<IGitHubTokenStore>();
+	[Fact]
+	public async Task ExchangesCodeAndSavesToken_GivenValidBrowserState()
+	{
+		using var cache = new MemoryCache(new MemoryCacheOptions());
+		var stateService = new OAuthStateService(cache, TimeProvider.System);
+		var start = new DefaultHttpContext();
+		var state = stateService.Create(start, "github");
+		var client = Substitute.For<IGitHubClient>();
+		var store = Substitute.For<IGitHubTokenStore>();
+		var token = new GitHubTokenRecord { AccessToken = "test", Username = "tester", Scope = "repo", UpdatedAtUtc = DateTimeOffset.UtcNow };
+		client.ExchangeCodeForTokenAsync("code", Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(token);
+		var endpoint = Factory.Create<GitHubAuthCallbackEndpoint>(client, store, Substitute.For<ILogger<GitHubAuthCallbackEndpoint>>(), stateService);
+		endpoint.HttpContext.Request.Scheme = "https";
+		endpoint.HttpContext.Request.Host = new HostString("localhost");
+		endpoint.HttpContext.Request.Headers.Cookie = start.Response.Headers.SetCookie.ToString().Split(';')[0];
 
-    [Fact]
-    public async Task ExchangesCodeAndSavesToken_GivenValidAuthCode()
-    {
-        var tokenRecord = new GitHubTokenRecord
-        {
-            AccessToken = "ghp_test123",
-            Username = "octocat",
-            Scope = "repo",
-            UpdatedAtUtc = DateTimeOffset.UtcNow
-        };
-        _gitHubClient.ExchangeCodeForTokenAsync("abc123", Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(tokenRecord);
+		await endpoint.HandleAsync(new GitHubAuthCallbackRequest { Code = "code", State = state }, default);
 
-        await _gitHubClient.ExchangeCodeForTokenAsync("abc123", "https://localhost/api/github/auth/callback");
+		await store.Received(1).SaveTokenAsync(token, Arg.Any<CancellationToken>());
+		endpoint.HttpContext.Response.StatusCode.ShouldBe(200);
+	}
 
-        await _gitHubClient.Received(1).ExchangeCodeForTokenAsync(
-            "abc123",
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>());
-    }
+	[Theory]
+	[InlineData(null)]
+	[InlineData("arbitrary-nonempty-state")]
+	public async Task RejectsBeforeTokenExchange_GivenUnverifiedState(string? state)
+	{
+		using var cache = new MemoryCache(new MemoryCacheOptions());
+		var stateService = new OAuthStateService(cache, TimeProvider.System);
+		var client = Substitute.For<IGitHubClient>();
+		var store = Substitute.For<IGitHubTokenStore>();
+		var endpoint = Factory.Create<GitHubAuthCallbackEndpoint>(client, store, Substitute.For<ILogger<GitHubAuthCallbackEndpoint>>(), stateService);
 
-    [Fact]
-    public void ClientAndStoreAreInitialized_GivenMockSetup()
-    {
-        _gitHubClient.ShouldNotBeNull();
-        _tokenStore.ShouldNotBeNull();
-    }
+		await endpoint.HandleAsync(new GitHubAuthCallbackRequest { Code = "code", State = state }, default);
 
-    [Fact]
-    public async Task TokenStoreCanSave_GivenValidToken()
-    {
-        var tokenRecord = new GitHubTokenRecord
-        {
-            AccessToken = "ghp_save_test",
-            Username = "testuser",
-            Scope = "repo",
-            UpdatedAtUtc = DateTimeOffset.UtcNow
-        };
+		endpoint.HttpContext.Response.StatusCode.ShouldBe(400);
+		await client.DidNotReceiveWithAnyArgs().ExchangeCodeForTokenAsync(default!, default!, default);
+		await store.DidNotReceiveWithAnyArgs().SaveTokenAsync(default!, default);
+	}
 
-        await _tokenStore.SaveTokenAsync(tokenRecord);
+	[Fact]
+	public async Task RejectsLinkedInBeforeTokenExchange_GivenUnverifiedState()
+	{
+		using var cache = new MemoryCache(new MemoryCacheOptions());
+		var factory = Substitute.For<IHttpClientFactory>();
+		var store = Substitute.For<ILinkedInTokenStore>();
+		var endpoint = Factory.Create<LinkedInAuthCallbackEndpoint>(factory, Options.Create(new LinkedInOptions()), store,
+			Substitute.For<ILogger<LinkedInAuthCallbackEndpoint>>(), new OAuthStateService(cache, TimeProvider.System));
 
-        await _tokenStore.Received(1).SaveTokenAsync(
-            Arg.Is<GitHubTokenRecord>(t =>
-                t != null &&
-                t.AccessToken == "ghp_save_test" &&
-                t.Username == "testuser"),
-            Arg.Any<CancellationToken>());
-    }
+		await endpoint.HandleAsync(new LinkedInAuthCallbackRequest { Code = "code", State = "unverified" }, default);
+
+		endpoint.HttpContext.Response.StatusCode.ShouldBe(400);
+		factory.DidNotReceiveWithAnyArgs().CreateClient(default!);
+		await store.DidNotReceiveWithAnyArgs().SaveTokensAsync(default!, default);
+	}
 }
