@@ -10,6 +10,7 @@ A cross-platform social-media posting API built with .NET 10, Aspire, and FastEn
 - [API Endpoints](#api-endpoints)
   - [POST /api/social-posts — Create Social Post (JSON)](#post-apisocial-posts--create-social-post-json)
   - [POST /api/social-posts/upload — Create Social Post (Multipart Upload)](#post-apisocial-postsupload--create-social-post-multipart-upload)
+  - [Scheduled Post Management](#scheduled-post-management)
   - [POST /api/social-posts/scheduled/process — Process Due Scheduled Posts](#post-apisocial-postsscheduledprocess--process-due-scheduled-posts)
   - [POST /api/social-posts/rss-promotion — Trigger RSS Blog Promotion](#post-apisocial-postsrss-promotion--trigger-rss-blog-promotion)
   - [POST /api/social-posts/rss-random — Post Random RSS Entry](#post-apisocial-postsrss-random--post-random-rss-entry)
@@ -454,6 +455,130 @@ When `scheduledFor` is provided and is in the future, the response indicates the
 
 ---
 
+### Scheduled Post Management
+
+Manage the existing one-off scheduled-post queue and its published history. These endpoints require `X-Api-Key`; mutations accept JSON. They do not call social providers. Immediate posts created without `scheduledFor` are not stored in this history. Recurring job definitions remain under `/api/jobs`.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/api/social-posts/scheduled` | List scheduled records, including published, failed, and cancelled records. |
+| GET | `/api/social-posts/scheduled/{id}` | Inspect content, delivery receipts, operator confirmations, and the current version. |
+| PATCH | `/api/social-posts/scheduled/{id}` | Edit or reschedule a pending post that has never been attempted. |
+| POST | `/api/social-posts/scheduled/{id}/cancel` | Cancel a pending post while preserving its history. |
+| POST | `/api/social-posts/scheduled/{id}/reconcile` | Record externally verified, fully published deliveries. |
+| POST | `/api/social-posts/scheduled/{id}/retry` | Queue an explicit retry of the remaining verified non-deliveries. |
+
+#### List and Inspect
+
+List query parameters:
+
+| Parameter | Default | Description |
+|---|---|---|
+| `status` | All | Case-insensitive name: `Pending`, `Processing`, `Published`, `Failed`, `NeedsReview`, or `Cancelled`. |
+| `from` | None | Inclusive lower bound on the scheduled timestamp, using an ISO 8601 date/time. Prefer an explicit UTC `Z`. |
+| `to` | None | Inclusive upper bound on the scheduled timestamp; must not precede `from`. |
+| `pageSize` | 50 | Maximum page size, from 1 to 100. |
+| `continuationToken` | None | Opaque token from the previous response. URL-encode it and keep the same filters. |
+
+```http
+GET /api/social-posts/scheduled?status=NeedsReview&pageSize=50
+X-Api-Key: YOUR_API_KEY
+```
+
+The response contains `posts` and `continuationToken`. Each summary includes `scheduledPostId`, `status`, `version`, `textPreview`, `scheduledForUtc`, `createdAtUtc`, `publishedAtUtc`, `platforms`, `attemptCount`, and `successfulPlatformCount`. Pagination follows Azure Table row-key order, not chronological order. Keep paging until the token is null, even if a page is empty. For a calendar, query the desired scheduled date range and sort the collected records by `scheduledForUtc`.
+
+The details endpoint returns the summary under `post`, plus `text`, `hashtags`, `autoThread`, `images`, `deliveries`, `confirmations`, attempt/lease/update timestamps, error details, `lastManagementAction`, and `managementNote`. Image details identify URL versus uploaded sources, alt text, and available file metadata; they do not expose private blob names. Delivery details include platform post IDs, URLs, success/error information, and original thread-segment receipts. No raw exception objects are returned.
+
+#### Versioned Changes
+
+Every mutation requires `version`, copied exactly from the latest details response's `post.version` or list summary. Treat it as an opaque string; preserve embedded quotes when serializing JSON. Wildcard versions are rejected. A concurrent scheduler claim or another edit causes HTTP `409`; reload the record before deciding whether to repeat the action. The URL identifies the post; an `id` supplied in the body cannot change the target.
+
+| Status | Meaning |
+|---|---|
+| 200 | Operation completed; the response contains updated details and the new version. |
+| 400 | Invalid input, missing version/confirmation, or invalid merged content. |
+| 401 | Missing or invalid API key. |
+| 404 | Scheduled post not found. |
+| 409 | Stale version, concurrent write, or operation not allowed in the current state. |
+
+#### Edit, Reschedule, and Cancel
+
+PATCH fields are optional, but at least one change is required. Omitted or null fields retain their current value.
+
+| Field | Description |
+|---|---|
+| `version` | Required current version. |
+| `text` | Up to 10,000 characters. Empty text is allowed only if an image remains. |
+| `hashtags` | Replacement array; `[]` clears it. Up to 100 nonblank tags, each at most 100 characters without whitespace. |
+| `platforms` | Replacement array of distinct configured platform names; at least one is required when supplied. |
+| `images` | Replacement URL attachments, each with `url` and `altText`. `[]` removes URL attachments. |
+| `removeUploadedImages` | When true, removes uploaded attachments from the post. It does not delete the underlying blobs. |
+| `autoThread` | Replaces the threading setting. |
+| `scheduledFor` | New future ISO 8601 timestamp, normalized to UTC. |
+
+The combined number of retained uploads and URL attachments cannot exceed four. URL attachments use HTTP(S) URLs up to 2,048 characters and nonblank alt text up to 1,500 characters. New file uploads still use the existing create-upload endpoint; PATCH does not accept arbitrary storage blob references.
+
+```http
+PATCH /api/social-posts/scheduled/POST_ID
+X-Api-Key: YOUR_API_KEY
+Content-Type: application/json
+```
+
+```json
+{
+  "version": "<current post.version>",
+  "text": "Updated launch announcement",
+  "autoThread": true,
+  "scheduledFor": "2026-09-20T14:00:00Z"
+}
+```
+
+Only `Pending` posts with no attempts or delivery history can be edited. A pending retry can be cancelled, but its content cannot be rewritten after earlier deliveries. To cancel, POST to `/{id}/cancel` with `version` and a nonblank `note` of at most 1,000 characters. Cancellation retains the record and receipts, prevents future processing, and does not remove anything already published. Processing, published, and cancelled records cannot be cancelled.
+
+#### Reconcile and Retry
+
+For a `NeedsReview` or `Failed` record:
+
+1. GET its details and inspect the provider accounts, including any partial threads.
+2. POST confirmed complete deliveries to `/{id}/reconcile`. Each entry identifies an unresolved target platform and its published post ID; an HTTP(S) post URL is optional.
+3. If unresolved platforms remain, the record stays `NeedsReview` and is not automatically replayed. Confirmations retain the operator's note and timestamp. Once all targets are confirmed successful, the record becomes `Published`.
+4. After verifying that no post exists for every remaining platform, POST to `/{id}/retry` with the new version, exactly those remaining platform names, `confirmNotPublished: true`, and an explanatory note.
+
+Example reconciliation body:
+
+```json
+{
+  "version": "<current post.version>",
+  "note": "Verified the complete Bluesky thread in the account",
+  "publishedDeliveries": [
+    {
+      "platform": "bluesky",
+      "postId": "at://did:plc:example/app.bsky.feed.post/example",
+      "postUrl": "https://bsky.app/profile/example/post/example"
+    }
+  ]
+}
+```
+
+Example retry body after reloading the updated version:
+
+```json
+{
+  "version": "<new post.version>",
+  "platforms": ["mastodon"],
+  "confirmNotPublished": true,
+  "note": "Checked Mastodon; neither a root post nor thread replies were published"
+}
+```
+
+Retry queues the record as `Pending` for the next processor run, or for an optional future `scheduledFor`. It retains successful receipts, which the processor skips. The endpoint does not publish synchronously. Repeated requests with an old version return `409`.
+
+A failed delivery with any published post ID, URL, or successful thread segment cannot be retried as a whole. Complete that thread manually and reconcile it as fully published. Original segment receipts remain available alongside the operator confirmation. Existing successful receipts cannot be overwritten.
+
+`Processing` records must first be recovered by the scheduled-post processor after their claim expires; management endpoints never take over an active claim. For legacy records whose target list was omitted, reconciliation/retry resolves the current configured platform set and requires the caller to account for all of it. Operator notes and the latest management action are stored with the post; these fields are not a full immutable audit log. These controls cannot guarantee exactly-once delivery across provider APIs and local storage.
+
+---
+
 ### POST /api/social-posts/scheduled/process — Process Due Scheduled Posts
 
 Processes scheduled posts that are due (`scheduledFor <= now`), posts them to configured target platforms, and returns run metrics.
@@ -469,7 +594,7 @@ Scheduled records retain `autoThread` and the target platforms selected when sch
 
 Processing uses optimistic concurrency and a 15-minute claim, renewed before each platform attempt. Each attempt has a five-minute cancellation timeout. The next processing run moves expired claims to `NeedsReview`, returning `DELIVERY_UNCERTAIN` in the run's failures. Partial threads and ambiguous provider failures also require review: a timeout or interrupted process may have occurred after a post was accepted. Automatic HTTP retries for publishing methods are disabled.
 
-There is no automatic replay or management endpoint for `NeedsReview` yet. Inspect the platform and stored `DeliveryResults` first. After confirming all deliveries, an operator can mark the stored record `Published`. To retry a confirmed non-delivery, preserve successful receipts, set `DeliveryTrackingEnabled` to `true`, clear `LeaseExpiresAtUtc`, and set `Status` to `Failed`. Complete partially published threads manually instead of replaying the whole thread.
+Use the [scheduled post management endpoints](#scheduled-post-management) to inspect receipts, confirm remotely published deliveries, and explicitly retry verified non-deliveries. Complete partially published threads manually and reconcile them instead of replaying the whole thread. There is no need to edit storage records directly.
 
 Legacy pending records remain supported (`autoThread` defaults to `false` because it was not previously stored). Legacy failed records without delivery tracking require review before retrying; their earlier successful deliveries cannot be inferred safely. These safeguards do not promise exactly-once delivery across a remote provider and local storage.
 

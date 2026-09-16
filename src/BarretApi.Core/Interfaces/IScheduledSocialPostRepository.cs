@@ -4,6 +4,12 @@ namespace BarretApi.Core.Interfaces;
 
 public interface IScheduledSocialPostRepository
 {
+	Task<ScheduledSocialPostRecord?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
+
+	Task<ScheduledPostsPage> ListAsync(ScheduledPostsQuery query, CancellationToken cancellationToken = default);
+
+	Task<bool> TryUpdateAsync(ScheduledSocialPostRecord record, CancellationToken cancellationToken = default);
+
 	Task SaveScheduledAsync(
 		ScheduledSocialPostRecord record,
 		CancellationToken cancellationToken = default);
