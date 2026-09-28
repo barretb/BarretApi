@@ -1,12 +1,11 @@
-namespace BarretApi.Core.Configuration;
+﻿namespace BarretApi.Core.Configuration;
 
 /// <summary>
 /// Configuration for the NASA APOD API client.
 /// </summary>
 public sealed class NasaApodOptions
 {
-    public const string SectionName = "NasaApod";
+	public const string SectionName = "NasaApod";
 
-    public required string ApiKey { get; init; }
-    public string BaseUrl { get; init; } = "https://api.nasa.gov/planetary/apod";
+	public string BaseUrl { get; init; } = "https://science.nasa.gov/wp-json/wp/v2/apod-basic";
 }

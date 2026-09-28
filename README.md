@@ -1092,9 +1092,9 @@ POST /api/social-posts/nasa-apod
 
 #### Behavior Details
 
-- **Image APOD**: Downloads the image, uses the APOD `explanation` field as alt text, attaches the image to the post. The HD image URL is included in the post text.
-- **Video APOD**: Uses the video thumbnail as the post image if available; otherwise posts text-only with the video URL.
-- **Copyright**: If the APOD has a copyright holder, a `Credit: {holder}` line is appended to the post text.
+- **Image APOD**: Downloads the image from NASA's hdurl field (url now points to the article), uses the APOD `explanation` field as alt text, attaches the image to the post. The HD image URL is included in the post text.
+- **Video APOD**: Treats both video and iframe entries as video. Uses the thumbnail or featured image if available; otherwise posts text-only with the APOD article URL.
+- **Copyright**: HTML in titles, explanations, and credits is converted to plain text. If the APOD has a copyright holder, a `Credit: {holder}` line is appended to the post text.
 - **Image Resizing**: Images are automatically resized to fit each platform's limits using a quality-first strategy (JPEG quality 85→45), falling back to dimension reduction if needed.
 
 #### Status Codes
@@ -2273,10 +2273,13 @@ Either `ConnectionString` **or** `AccountEndpoint` must be set. The table name m
 
 ### NASA APOD
 
+Uses the [NASA Science APOD API](https://github.com/nasa/apod-api). No NASA API key is required; the AppHost no longer requires the nasa-apod-api-key parameter. Existing stored keys may be removed. Deployments overriding NasaApod:BaseUrl must use the new endpoint below.
+
+The client requests a specific date using `/YYMMDD` (for example, `/260920` for September 20, 2026). Without a date it requests the latest available entry using `?per_page=1`. Collection responses are supported; the legacy `date` query parameter is no longer used.
+
 | Config Key | Aspire Parameter | Environment Variable | Required | Default | Description |
 |---|---|---|---|---|---|
-| `NasaApod:ApiKey` | `nasa-apod-api-key` | `NasaApod__ApiKey` | Yes | — | NASA API key. Register free at <https://api.nasa.gov/>. |
-| `NasaApod:BaseUrl` | — | — | No | `https://api.nasa.gov/planetary/apod` | NASA APOD API base URL. Not mapped in AppHost. |
+| `NasaApod:BaseUrl` | — | — | No | `https://science.nasa.gov/wp-json/wp/v2/apod-basic` | NASA APOD API base URL. Not mapped in AppHost. |
 
 ### NASA GIBS
 

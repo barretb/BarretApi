@@ -30,7 +30,6 @@ var gitHubApiBaseUrl = builder.AddParameter("github-api-base-url");
 var gitHubOAuthBaseUrl = builder.AddParameter("github-oauth-base-url");
 var gitHubTokenStorageTableName = builder.AddParameter("github-token-storage-table-name");
 var gitHubRepoStorageTableName = builder.AddParameter("github-repo-storage-table-name");
-var nasaApodApiKey = builder.AddParameter("nasa-apod-api-key", secret: true);
 var gibsBaseUrl = builder.AddParameter("gibs-base-url");
 var gibsDefaultLayer = builder.AddParameter("gibs-default-layer");
 var gibsBboxSouth = builder.AddParameter("gibs-bbox-south");
@@ -88,7 +87,6 @@ builder.AddProject<Projects.BarretApi_Api>("api")
     .WithEnvironment("TipOfDay__TableStorage__ConnectionString", azuriteConnectionString)
     .WithEnvironment("TipOfDay__TableStorage__TableName", tipOfDayTableStorageTableName)
     .WithEnvironment("TipOfDay__TableStorage__PartitionKey", tipOfDayTableStoragePartitionKey)
-    .WithEnvironment("NasaApod__ApiKey", nasaApodApiKey)
     .WithEnvironment("NasaGibs__BaseUrl", gibsBaseUrl)
     .WithEnvironment("NasaGibs__DefaultLayer", gibsDefaultLayer)
     .WithEnvironment("NasaGibs__BboxSouth", gibsBboxSouth)
