@@ -188,8 +188,6 @@ builder.Services.AddSingleton<ITipOfDayService>(sp => sp.GetRequiredService<TipO
 builder.Services.Configure<NasaApodOptions>(builder.Configuration.GetSection(NasaApodOptions.SectionName));
 builder.Services.AddHttpClient<NasaApodClient>((sp, client) =>
 {
-	var nasaOptions = builder.Configuration.GetSection(NasaApodOptions.SectionName);
-	client.BaseAddress = new Uri(nasaOptions["BaseUrl"] ?? "https://api.nasa.gov");
 	client.Timeout = TimeSpan.FromSeconds(15);
 });
 builder.Services.AddSingleton<INasaApodClient>(sp => sp.GetRequiredService<NasaApodClient>());
