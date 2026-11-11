@@ -75,5 +75,8 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'barretapi'
+          # Two Web Apps named barretapi exist while the old dungeonhost
+          # instance is being decommissioned; pin the deploy to the new one.
+          resource-group-name: 'generalapps'
           slot-name: 'Production'
           package: ${{ env.PUBLISH_PATH }}
