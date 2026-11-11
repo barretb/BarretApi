@@ -2363,11 +2363,24 @@ Rate limiting is **always active** when email notifications are enabled. No addi
 
 The deployment workflow runs the solution tests in Release configuration before publishing. A failing test prevents deployment.
 
-Pushing to `main` builds, publishes, and deploys the API to the `barretapi` Azure Web App via `.github/workflows/main_barretapi.yml`. The workflow can also be triggered by hand with `workflow_dispatch`. Azure authentication uses OIDC federated credentials (`azure/login@v2`) — there is no publish profile or password secret, only the client/tenant/subscription IDs.
+Pushing to `main` builds, publishes, and deploys the API to the `barretapi` Azure Web App in resource group `generalapps` (App Service plan `as-generalapps`, East US) via `.github/workflows/main_barretapi.yml`. The workflow can also be triggered by hand with `workflow_dispatch`. Azure authentication uses OIDC federated credentials (`azure/login@v2`) through the user-assigned managed identity `barretapi-id-90f3`, which holds **Website Contributor** on the Web App — there is no publish profile or password secret, only the client/tenant/subscription IDs.
+
+The workflow passes `resource-group-name: generalapps` to the deploy step because the previous instance (also named `barretapi`, in resource group `dungeonhost`) still exists until it is decommissioned.
+
+### Azure resources
+
+| Resource | Name | Resource group | Notes |
+|---|---|---|---|
+| Web App | `barretapi` | `generalapps` | Linux, .NET 10, Always On, system-assigned managed identity |
+| App Service plan | `as-generalapps` | `generalapps` | Basic B1, East US |
+| Storage account | `stgeneralapps` | `generalapps` | All tables and blob containers. The Web App's managed identity has **Storage Table Data Contributor** and **Storage Blob Data Contributor**; settings ending in `AccountEndpoint` rely on those roles, settings ending in `ConnectionString` use the account key. |
+| Deploy identity | `barretapi-id-90f3` | `dungeonhost` | Federated credential for `repo:barretb/BarretApi:ref:refs/heads/main` |
+
+Production configuration is stored as App Service application settings on the Web App, not in the repository.
 
 Build and deploy are a single job. They were split so the publish output could cross between two GitHub-hosted runners as an artifact; both halves now run on the same machine, so that upload/download round-trip was removed.
 
-Note that CI does not run the test suites — it only proves the API project compiles and publishes. Run them locally before pushing:
+CI runs the full test suite before publishing, but running it locally before pushing catches failures sooner:
 
 ```bash
 dotnet test
