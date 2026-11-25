@@ -184,6 +184,10 @@ POST /api/social-posts
 }
 ```
 
+#### Text Shortening
+
+Without `autoThread`, text over a platform's limit (Bluesky 300, Mastodon instance limit, LinkedIn 3,000) is shortened for that platform only. Trailing hashtags are dropped first, then the text before the first URL is truncated at a word boundary with `…`. URLs are never cut.
+
 #### Preview Without Publishing
 
 Set `dryRun: true` on the JSON endpoint to preview shortened text or thread segments. This takes precedence over `scheduledFor`. The response has `dryRun: true`, `postedAt: null`, and `scheduled: false`. Thread previews include `threadedPosts` with prepared text but no published IDs or URLs. Preview retrieves platform limits; it does not download, upload, or validate image bytes.

@@ -8,7 +8,8 @@ namespace BarretApi.Core.Services;
 /// Shortens text to fit within a maximum grapheme cluster count,
 /// truncating at word boundaries and appending a Unicode ellipsis (U+2026).
 /// When trailing hashtags are present, removes them from the end first
-/// before truncating body text (per FR-007).
+/// before truncating body text (per FR-007). URLs are never truncated:
+/// the text before the first URL is shortened instead.
 /// </summary>
 public sealed partial class TextShorteningService : ITextShorteningService
 {
@@ -17,6 +18,9 @@ public sealed partial class TextShorteningService : ITextShorteningService
 
     [GeneratedRegex(@"(\s+#\w+)+\s*$", RegexOptions.Compiled)]
     private static partial Regex TrailingHashtagsPattern();
+
+    [GeneratedRegex(@"https?://[^\s\)\]\}>""]+", RegexOptions.Compiled)]
+    private static partial Regex UrlPattern();
 
     public string Shorten(string text, int maxGraphemeClusters)
     {
@@ -45,7 +49,8 @@ public sealed partial class TextShorteningService : ITextShorteningService
         }
 
         // If still too long after removing all trailing hashtags, truncate the body
-        return TruncateWithEllipsis(body.TrimEnd(), maxGraphemeClusters);
+        // while always keeping any URLs intact.
+        return TruncatePreservingUrls(body.TrimEnd(), maxGraphemeClusters);
     }
 
     private static (string Body, List<string> TrailingHashtags) SplitTrailingHashtags(string text)
@@ -84,6 +89,56 @@ public sealed partial class TextShorteningService : ITextShorteningService
         }
 
         return null;
+    }
+
+    private static string TruncatePreservingUrls(string text, int maxGraphemeClusters)
+    {
+        var firstUrl = UrlPattern().Match(text);
+
+        if (!firstUrl.Success)
+        {
+            return TruncateWithEllipsis(text, maxGraphemeClusters);
+        }
+
+        var prefix = text[..firstUrl.Index];
+        var trimmedPrefix = prefix.TrimEnd();
+        var separator = prefix[trimmedPrefix.Length..];
+        var tail = text[firstUrl.Index..].TrimEnd();
+
+        if (separator.Length == 0)
+        {
+            separator = " ";
+        }
+
+        var tailCount = CountGraphemeClusters(tail);
+        var prefixBudget = maxGraphemeClusters - tailCount - CountGraphemeClusters(separator);
+
+        if (tailCount <= maxGraphemeClusters)
+        {
+            if (trimmedPrefix.Length == 0 || prefixBudget <= EllipsisGraphemeCount)
+            {
+                return tail;
+            }
+
+            return TruncateWithEllipsis(trimmedPrefix, prefixBudget) + separator + tail;
+        }
+
+        // The text from the first URL onward is too long on its own: keep only the URLs that fit.
+        var urls = UrlPattern().Matches(text).Select(m => m.Value).ToList();
+        var kept = urls[0];
+
+        foreach (var url in urls.Skip(1))
+        {
+            var candidate = $"{kept}\n{url}";
+            if (CountGraphemeClusters(candidate) > maxGraphemeClusters)
+            {
+                break;
+            }
+
+            kept = candidate;
+        }
+
+        return kept;
     }
 
     private static string TruncateWithEllipsis(string text, int maxGraphemeClusters)
